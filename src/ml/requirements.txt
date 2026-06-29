@@ -1,0 +1,4 @@
+pymssql==2.2.11
+pandas==2.2.1
+scikit-learn==1.4.1.post1
+paho-mqtt==2.0.0

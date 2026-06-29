@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "EcoPulse IoT",
+    "slug": "eco-pulse-iot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+    },
+    "web": {
+    }
+  }
+}
