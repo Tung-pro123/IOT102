@@ -21,8 +21,90 @@ const predictionTopic = "smarthome/bin/prediction";
 
 let pool;
 
-// WebSocket Server để mobile app kết nối
-const wss = new WebSocket.Server({ port: 3001 });
+const http = require("http");
+
+// Hàm truy vấn lịch sử rác theo một ngày cụ thể (YYYY-MM-DD) từ SQL Server
+async function getHistoryByDate(dateStr) {
+  if (!pool) {
+    throw new Error("Chưa kết nối Database");
+  }
+  try {
+    const result = await pool.request()
+      .input("date", sql.VarChar, dateStr)
+      .query(`
+        SELECT timestamp, garbage_level
+        FROM GarbageHistory
+        WHERE CONVERT(DATE, timestamp) = @date
+        ORDER BY timestamp ASC
+      `);
+
+    const records = result.recordset;
+    if (records.length === 0) return [];
+    
+    // Thu thập tối đa khoảng 50 điểm trải đều trong ngày
+    const maxPoints = 50;
+    const step = Math.max(1, Math.floor(records.length / maxPoints));
+    const history = [];
+    
+    for (let i = 0; i < records.length; i += step) {
+      const row = records[i];
+      const timeStr = new Date(row.timestamp).toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      history.push({
+        time: timeStr,
+        actual: Math.round(row.garbage_level),
+        prediction: null
+      });
+    }
+    return history;
+  } catch (err) {
+    console.error("Lỗi khi truy vấn lịch sử theo ngày:", err);
+    throw err;
+  }
+}
+
+// Khởi tạo HTTP Server để xử lý API tìm kiếm lịch sử
+const server = http.createServer(async (req, res) => {
+  // Cấu hình CORS để React chạy cổng 5173 truy cập được
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+
+  // Phân tích đường dẫn API
+  const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  
+  if (parsedUrl.pathname === "/api/history") {
+    const dateStr = parsedUrl.searchParams.get("date"); // Định dạng "YYYY-MM-DD"
+    if (!dateStr) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Thiếu tham số date" }));
+      return;
+    }
+
+    try {
+      const history = await getHistoryByDate(dateStr);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(history));
+    } catch (err) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+  } else {
+    res.writeHead(404);
+    res.end("API Not Found");
+  }
+});
+
+// WebSocket Server để mobile app kết nối (chạy chung cổng 3001 thông qua HTTP Server)
+const wss = new WebSocket.Server({ server });
 let wsClients = new Set();
 
 wss.on("connection", (ws) => {
@@ -88,6 +170,10 @@ async function setupDatabase() {
 
 async function startApp() {
   await setupDatabase();
+
+  server.listen(3001, () => {
+    console.log("🚀 Backend Server (HTTP + WS) đang chạy trên cổng 3001");
+  });
 
   console.log("Đang kết nối tới MQTT Broker...");
   const client = mqtt.connect(brokerUrl);

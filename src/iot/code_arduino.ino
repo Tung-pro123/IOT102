@@ -3,45 +3,42 @@
 #include <DHT.h>
 #include <Servo.h> 
 #include <SoftwareSerial.h> // Khai báo thư viện giao tiếp ESP8266
-#include "DFRobotDFPlayerMini.h" // Thư viện cho DFPlayerMini// ====== CẤU HÌNH CÁC CHÂN KẾT NỐI (PINS) ======
+#include "DFRobotDFPlayerMini.h" // Thư viện cho DFPlayerMini
+#include <EEPROM.h> // Thư viện đọc/ghi bộ nhớ lưu trữ vĩnh viễn EEPROM trên Arduino
 
-// --- Chân từ Code của Bạn của bạn (Chức năng đóng/mở nắp) ---
-#define HAND_TRIG_PIN 3     // Cảm biến siêu âm đo tay người (Code của bạn)
+// ====== CẤU HÌNH CÁC CHÂN KẾT NỐI (PINS) ======
+
+// --- Chân cảm biến siêu âm đo tay người ---
+#define HAND_TRIG_PIN 3     
 #define HAND_ECHO_PIN 2     
-#define SERVO_PIN 10       // Động cơ MG996R (Code của bạn)
+#define SERVO_PIN 10       // Động cơ Servo MG996R
 
-// --- Chân từ Code của Bạn (Chức năng đo mức rác & môi trường) ---
-#define GARBAGE_TRIG_PIN 9  // Cảm biến siêu âm đo mức rác (Code bạn)
+// --- Chân cảm biến siêu âm đo mức rác ---
+#define GARBAGE_TRIG_PIN 9  
 #define GARBAGE_ECHO_PIN 8 
-#define MQ135_PIN A0        // Chân Analog đọc khí Gas (Code bạn)
-#define DHTPIN 7            // Chân Digital 7 đọc DHT11 (Cả 2 dùng chung chân 7, giữ nguyên)
+#define MQ135_PIN A0        // Chân Analog đọc khí Gas
+#define DHTPIN 7            // Chân Digital 7 đọc DHT11
 
-// --- Chân giao tiếp với ESP8266 (Từ code của bạn) ---
-// Chú ý: Dựa trên code của bạn, RX=11, TX=12. 
-// Đảm bảo dây cắm: Chân 11(TX_UNO) nối sang RX_ESP, 12(RX_UNO) nối sang TX_ESP.
+// --- Chân giao tiếp với ESP8266 ---
 SoftwareSerial espSerial(11, 12); // (RX, TX) ảo trên UNO
 
 // --- Chân giao tiếp với Loa DFPlayer Mini ---
-// Chúng ta sẽ dùng chân 4 và 5 vì các chân khác đã kín.
-#define DFPLAYER_RX 4  // Chân 4 nối với TX của DFPlayer
-#define DFPLAYER_TX 5  // Chân 5 nối với RX của DFPlayer
+#define DFPLAYER_RX 4  
+#define DFPLAYER_TX 5  
 SoftwareSerial dfSerial(DFPLAYER_RX, DFPLAYER_TX);
 DFRobotDFPlayerMini myDFPlayer;
 
 // ====== ĐỊNH NGHĨA CÁC THÔNG SỐ ======
 #define DHTTYPE DHT11  
 
-// Ngưỡng khoảng cách (cm) để mở nắp (Từ Code của bạn)
+// Ngưỡng khoảng cách (cm) để mở nắp tự động
 const int NGHUONG_KHOANG_CACH = 15; 
 
-// Góc quay Servo (Đã chỉnh lại để chống kẹt bánh răng)
-const int GOC_MO_NAP = 150;   
-const int GOC_DONG_NAP = 20;   
+// Góc quay Servo
+const int GOC_MO_NAP = 120;   
+const int GOC_DONG_NAP = 40;   
 
-// Chiều cao thùng (cm) để tính phần trăm rác (Từ Code của bạn)
-const int BIN_HEIGHT = 25;
-
-// ====== KHỞI TẠO ĐỐI TƯỢNG (OBJECTS) ======
+// ====== KHỞI TẠO ĐỐI TƯỢNG ======
 LiquidCrystal_I2C lcd(0x27, 16, 2); 
 DHT dht(DHTPIN, DHTTYPE);
 Servo servoNapThung; 
@@ -52,12 +49,14 @@ float doAm = 0.0;
 int intGasValue = 0; 
 
 long handDuration = 0;
-float handDistance = 0.0; // Khoảng cách tay để mở nắp (Code của bạn)
+float handDistance = 0.0; 
 String trangThaiLid = "DONG";
 
 long garbageDuration = 0;
-int garbageDistance = 0; // Khoảng cách từ cảm biến mức rác xuống (Code bạn)
-int intGarbageLevel = 0; // Phần trăm rác tính được
+int garbageDistance = 0; 
+int intGarbageLevel = 0; 
+bool lastLidState = false; 
+bool lastTrashFullState = false; 
 
 // Ký tự độ C đặc biệt hiển thị trên LCD
 byte kyTuDoC[8] = {
@@ -69,35 +68,83 @@ byte kyTuDoC[8] = {
 unsigned long lastSensorRead = 0;
 unsigned long lastDataSend = 0;
 
+// ====== CÁC BIẾN ĐIỀU KHIỂN TỪ XA GHI ĐÈ GIAO DIỆN WEB ======
+String manualCommand = "auto"; // "auto", "open", "close"
+bool manualAlarm = false;
+bool lastManualAlarm = false;
+
+// ====== ĐỊNH NGHĨA STRUCT ĐỂ LƯU CẤU HÌNH VÀO EEPROM VĨNH VIỄN ======
+struct ConfigData {
+  byte signature;       // Chữ ký xác nhận đã cấu hình (ví dụ 0xAA)
+  byte nguongDayRac;    // Ngưỡng đầy rác
+  int nguongGas;        // Ngưỡng khí gas (kiểu int chiếm 2 byte)
+  byte binHeightVal;    // Chiều cao thùng
+  byte volumeVal;       // Âm lượng loa
+} myConfig;
+
+// Các biến cấu hình động được gán từ bộ nhớ EEPROM hoặc mặc định
+int nguongDayRac;
+int nguongGas;
+int binHeightVal;
+int volumeVal;
+
 void setup() {
   Serial.begin(9600);
   Serial.println("====== KHOI DONG HE THONG THUNG RAC THONG MINH TONG HOP ======");
   
+  // --- ĐỌC CẤU HÌNH VĨNH VIỄN TỪ EEPROM ---
+  EEPROM.get(0, myConfig);
+  if (myConfig.signature != 0xAA) {
+    // Nếu chưa từng cấu hình từ Web (chưa có chữ ký 0xAA), thiết lập mặc định
+    Serial.println(F("💾 EEPROM trống! Đang thiết lập cấu hình mặc định ban đầu..."));
+    myConfig.signature = 0xAA;
+    myConfig.nguongDayRac = 80;
+    myConfig.nguongGas = 500;
+    myConfig.binHeightVal = 25;
+    myConfig.volumeVal = 18;
+    EEPROM.put(0, myConfig); // Lưu lại cấu hình mặc định vào EEPROM
+  } else {
+    Serial.println(F("💾 Đã tìm thấy cấu hình cũ lưu trong bộ nhớ EEPROM!"));
+  }
+  
+  // Gán cấu hình động từ struct ra các biến sử dụng trong chương trình
+  nguongDayRac = myConfig.nguongDayRac;
+  nguongGas = myConfig.nguongGas;
+  binHeightVal = myConfig.binHeightVal;
+  volumeVal = myConfig.volumeVal;
+
+  Serial.print(F("🔧 Cấu hình hiện tại - Rác: ")); Serial.print(nguongDayRac);
+  Serial.print(F("%, Gas: ")); Serial.print(nguongGas);
+  Serial.print(F("ppm, Cao: ")); Serial.print(binHeightVal);
+  Serial.print(F("cm, Vol: ")); Serial.println(volumeVal);
+
   espSerial.begin(9600); // Khởi động Serial sang ESP8266
   
   // Khởi động Serial cho DFPlayer Mini
   dfSerial.begin(9600); 
-
-  // Lưu ý: SoftwareSerial chỉ lắng nghe được 1 cổng tại 1 thời điểm.
-  // Ta gọi dfSerial.listen() để DFPlayer có thể báo cáo trạng thái lúc khởi động.
+  
+  // SoftwareSerial chỉ lắng nghe được 1 cổng tại 1 thời điểm.
   dfSerial.listen(); 
+  delay(10);
   if (!myDFPlayer.begin(dfSerial)) {
     Serial.println(F("Khong ket noi duoc DFPlayer! Kiem tra day cam hoac the nho."));
   } else {
     Serial.println(F("DFPlayer da san sang."));
-    myDFPlayer.volume(30);  // Đặt âm lượng (0 - 30)
-    myDFPlayer.loop(1);     // Phát vòng lặp bài số 1 liên tục
+    myDFPlayer.volume(volumeVal);  // Đặt âm lượng lấy từ bộ nhớ EEPROM
   }
+
+  // Chuyển sang lắng nghe tín hiệu điều khiển từ ESP8266
+  espSerial.listen();
 
   // Khởi tạo các chân Cảm biến Siêu âm 1 (Đo tay)
   pinMode(HAND_TRIG_PIN, OUTPUT);
   pinMode(HAND_ECHO_PIN, INPUT);
 
-  // Khởi tạo các chân Cảm biến Siêu âm 2 (Mức rác - Code bạn)
+  // Khởi tạo các chân Cảm biến Siêu âm 2 (Mức rác)
   pinMode(GARBAGE_TRIG_PIN, OUTPUT);
   pinMode(GARBAGE_ECHO_PIN, INPUT);
   
-  // Khởi tạo cảm biến MQ-135 (Code bạn)
+  // Khởi tạo cảm biến MQ-135
   pinMode(MQ135_PIN, INPUT);
 
   // Khởi tạo cảm biến DHT11
@@ -124,16 +171,67 @@ void setup() {
 }
 
 void loop() {
+  // ====== BUOC 0: ĐỌC LỆNH ĐIỀU KHIỂN & CẤU HÌNH TỪ ESP8266 (WEB) ======
+  if (espSerial.available()) {
+    String cmdLine = espSerial.readStringUntil('\n');
+    cmdLine.trim();
+    if (cmdLine.startsWith("CMD:")) {
+      String command = cmdLine.substring(4);
+      Serial.print("Nhan lenh tu ESP: ");
+      Serial.println(command);
+      
+      if (command == "open") {
+        manualCommand = "open";
+      } else if (command == "close") {
+        manualCommand = "close";
+      } else if (command == "auto") {
+        manualCommand = "auto";
+      } else if (command == "play_alarm") {
+        manualAlarm = true;
+      } else if (command == "stop_alarm") {
+        manualAlarm = false;
+      } 
+      
+      // XỬ LÝ LỆNH CẤU HÌNH ĐỘNG TỪ WEB VÀ LƯU VÀO EEPROM: config:trash:gas:height:vol
+      else if (command.startsWith("config:")) {
+        char tempBuf[40];
+        command.toCharArray(tempBuf, 40);
+        int trash, gas, height, vol;
+        if (sscanf(tempBuf, "config:%d:%d:%d:%d", &trash, &gas, &height, &vol) == 4) {
+          nguongDayRac = trash;
+          nguongGas = gas;
+          binHeightVal = height;
+          volumeVal = vol;
+          
+          // Ghi đè cấu hình mới vào struct
+          myConfig.nguongDayRac = nguongDayRac;
+          myConfig.nguongGas = nguongGas;
+          myConfig.binHeightVal = binHeightVal;
+          myConfig.volumeVal = volumeVal;
+          
+          // Ghi cấu hình mới vĩnh viễn vào bộ nhớ EEPROM
+          EEPROM.put(0, myConfig); 
+          Serial.println(F("💾 Đã lưu cấu hình mới vĩnh viễn vào EEPROM!"));
+
+          // Cập nhật ngay lập tức âm lượng sang DFPlayer Mini
+          dfSerial.listen();
+          delay(10);
+          myDFPlayer.volume(volumeVal);
+          delay(10);
+          espSerial.listen(); // Trả lại quyền lắng nghe lệnh cho ESP8266
+        }
+      }
+    }
+  }
+
   // ====== BUOC 1: ĐỌC DỮ LIỆU CẢM BIẾN MÔI TRƯỜNG (2 GIÂY/LẦN) ======
   if (millis() - lastSensorRead >= 2000 || lastSensorRead == 0) {
     // 1.1 Đọc DHT11
     float tempNhietDo = dht.readTemperature();
     float tempDoAm = dht.readHumidity();
     
-    // Kiểm tra nếu lỗi đọc DHT11
     if (isnan(tempDoAm) || isnan(tempNhietDo)) {
-      Serial.println("Lỗi: Không đọc được datos từ DHT11! Đưa về giá trị 0.");
-      // Giữ nguyên giá trị cũ nếu lỗi, hoặc reset về 0 tùy bạn
+      Serial.println("Loi: Khong doc duoc tu DHT11!");
     } else {
       nhietDo = tempNhietDo;
       doAm = tempDoAm;
@@ -141,46 +239,108 @@ void loop() {
     
     // 1.2 Đọc MQ-135 Khí Gas
     intGasValue = analogRead(MQ135_PIN);
-    
     lastSensorRead = millis();
   }
 
-  // ====== BUOC 2: ĐO KHOẢNG CÁCH TAY VÀ ĐIỀU KHIỂN NẮP (LOGIC BẠN BẠN) ======
-  
+  // ====== BUOC 2: ĐO KHOẢNG CÁCH TAY VÀ ĐIỀU KHIỂN NẮP ======
   digitalWrite(HAND_TRIG_PIN, LOW);
   delayMicroseconds(2);
   digitalWrite(HAND_TRIG_PIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(HAND_TRIG_PIN, LOW);
   
-  // Dùng timeout pulseIn() ngắn để tránh lag vòng loop (30ms)
   handDuration = pulseIn(HAND_ECHO_PIN, HIGH, 30000); 
   handDistance = handDuration * 0.034 / 2;
 
+  // Quyết định trạng thái nắp (Hỗ trợ ghi đè thủ công từ Web)
+  bool shouldOpen = false;
+  if (manualCommand == "open") {
+    shouldOpen = true;
+  } else if (manualCommand == "close") {
+    shouldOpen = false;
+  } else {
+    // Chế độ tự động
+    shouldOpen = (handDistance > 0 && handDistance < NGHUONG_KHOANG_CACH);
+  }
+
   // Điều khiển Servo và cập nhật trạng thái
-  if (handDistance > 0 && handDistance < NGHUONG_KHOANG_CACH) {
+  if (shouldOpen) {
     servoNapThung.write(GOC_MO_NAP);
-    trangThaiLid = "MO "; // Thêm khoảng trắng để xóa chữ "D" cũ
+    trangThaiLid = "MO "; 
   } else {
     servoNapThung.write(GOC_DONG_NAP);
     trangThaiLid = "DONG";
   }
 
-  // ====== BUOC 3: ĐO MỨC RÁC HIỆN TẠI (LOGIC CODE BẠN) ======
-  
+  // ====== BUOC 3: ĐO MỨC RÁC HIỆN TẠI (DÙNG CHIỀU CAO THÙNG CẤU HÌNH ĐỘNG) ======
   digitalWrite(GARBAGE_TRIG_PIN, LOW);
   delayMicroseconds(2);
   digitalWrite(GARBAGE_TRIG_PIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(GARBAGE_TRIG_PIN, LOW);
 
-  // Dùng pulseIn() có timeout (30ms)
   garbageDuration = pulseIn(GARBAGE_ECHO_PIN, HIGH, 30000);
   garbageDistance = garbageDuration * 0.034 / 2;
   
-  // Tính toán mức phần trăm rác (%) (Code bạn)
-  intGarbageLevel = map(garbageDistance, BIN_HEIGHT, 5, 0, 100);
-  intGarbageLevel = constrain(intGarbageLevel, 0, 100); // Ép trong khoảng 0-100%
+  // Sử dụng biến binHeightVal thay vì hằng số cố định BIN_HEIGHT
+  intGarbageLevel = map(garbageDistance, binHeightVal, 5, 0, 100);
+  intGarbageLevel = constrain(intGarbageLevel, 0, 100); 
+
+  // ====== BUOC 3.5: ĐIỀU KHIỂN LOA DFPLAYER ======
+  bool currentTrashFull = (intGarbageLevel >= nguongDayRac);
+
+  // 3.5.1 Lệnh còi hú từ giao diện Web ghi đè
+  if (manualAlarm != lastManualAlarm) {
+    dfSerial.listen();
+    delay(10);
+    if (manualAlarm) {
+      Serial.println(F("🔊 [LOA BÁO ĐỘNG] -> Kích hoạt từ Web! Vòng lặp Bài 1..."));
+      myDFPlayer.loop(1);
+    } else {
+      Serial.println(F("🔇 [LOA BÁO ĐỘNG] -> Tắt còi báo động từ Web!"));
+      myDFPlayer.stop();
+    }
+    delay(10);
+    espSerial.listen(); // Trả lại quyền nghe lệnh cho ESP
+    lastManualAlarm = manualAlarm;
+  }
+
+  // 3.5.2 Chế độ tự động phát âm thanh khi còi hú tắt
+  if (!manualAlarm) {
+    // Trạng thái nắp thay đổi (Mở hoặc Đóng)
+    if (shouldOpen != lastLidState) {
+      dfSerial.listen();
+      delay(10);
+      if (shouldOpen) {
+        if (currentTrashFull) {
+          Serial.println(F("🔊 [LOA] -> Thung rac DAY! Phat canh bao (Bai 1)..."));
+          myDFPlayer.loop(1);
+        } else {
+          Serial.println(F("🔊 [LOA] -> Nap MO! Phat nhac chao mung (Bai 1)..."));
+          myDFPlayer.loop(1);
+        }
+      } else {
+        Serial.println(F("🔇 [LOA] -> Nap DONG! Dung phat nhac."));
+        myDFPlayer.stop();
+      }
+      delay(10);
+      espSerial.listen(); // Trả lại quyền nghe lệnh cho ESP
+      lastLidState = shouldOpen;
+    }
+
+    // Phát cảnh báo khi thùng rác vừa đầy lúc nắp đang đóng (phát 1 lần cảnh báo)
+    if (currentTrashFull != lastTrashFullState) {
+      if (currentTrashFull && !shouldOpen) {
+        dfSerial.listen();
+        delay(10);
+        Serial.println(F("🔊 [LOA] -> Thung rac VU DAY! Phat canh bao mot lan (Bai 1)..."));
+        myDFPlayer.play(1);
+        delay(10);
+        espSerial.listen(); // Trả lại quyền nghe lệnh cho ESP
+      }
+      lastTrashFullState = currentTrashFull;
+    }
+  }
 
   // ====== BUOC 4 & 5: HIỂN THỊ LCD VÀ GỬI JSON (1 GIÂY/LẦN) ======
   if (millis() - lastDataSend >= 1000 || lastDataSend == 0) {
@@ -188,21 +348,21 @@ void loop() {
     lcd.setCursor(0, 0);
     lcd.print("T:");
     lcd.print((int)nhietDo);
-    lcd.write(0); // Biểu tượng độ C đặc biệt
+    lcd.write(0); 
     lcd.print("C H:");
     lcd.print((int)doAm);
     lcd.print("% G:");
     lcd.print(intGasValue); 
-    lcd.print("   "); // Xóa ký tự thừa nếu số giảm nhanh
+    lcd.print("   "); 
 
     // Hàng 2: Lid:DONG Rac:xxx%
     lcd.setCursor(0, 1);
     lcd.print("Lid:");
     lcd.print(trangThaiLid);
-    lcd.setCursor(8, 1); // Đặt con trỏ sang ô thứ 8
+    lcd.setCursor(8, 1); 
     lcd.print("Rac:");
     lcd.print(intGarbageLevel);
-    lcd.print("%  "); // Xóa ký tự thừa
+    lcd.print("%  "); 
 
     // Gom dữ liệu vào JSON
     String jsonData = "{";
@@ -210,7 +370,7 @@ void loop() {
     jsonData += "\"gas\":" + String(intGasValue) + ","; 
     jsonData += "\"humidity\":" + String((int)doAm) + ",";
     jsonData += "\"temperature\":" + String((int)nhietDo) + ","; 
-    jsonData += "\"is_lid_open\":" + String((handDistance > 0 && handDistance < NGHUONG_KHOANG_CACH) ? "true" : "false");
+    jsonData += "\"is_lid_open\":" + String(shouldOpen ? "true" : "false");
     jsonData += "}";
 
     // Gửi dữ liệu qua Serial ảo sang ESP8266
@@ -218,6 +378,7 @@ void loop() {
 
     // DEBUG PRINT RA CỔNG SERIAL MÁY TÍNH
     Serial.print("HandDist:"); Serial.print(handDistance); Serial.print("cm | ");
+    Serial.print("Mode:"); Serial.print(manualCommand); Serial.print(" | ");
     Serial.print(" Rac:"); Serial.print(intGarbageLevel); Serial.print("% | ");
     Serial.print(" Gas:"); Serial.print(intGasValue); Serial.print(" | ");
     Serial.print(" Json:"); Serial.println(jsonData);

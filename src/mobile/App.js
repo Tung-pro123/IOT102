@@ -1,9 +1,9 @@
-import './polyfills';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, ScrollView, SafeAreaView, TouchableOpacity, Platform, StatusBar } from 'react-native';
 
 // Đọc IP từ .env (đổi IP này khi đổi mạng Wi-Fi)
-const SERVER_IP = process.env.REACT_NATIVE_PACKAGER_HOSTNAME || '10.1.6.18';
+const SERVER_IP = '192.168.0.102';
 const WS_URL = `ws://${SERVER_IP}:3001`;
 
 // Simple SVG Icons using Unicode or text for demo purposes
