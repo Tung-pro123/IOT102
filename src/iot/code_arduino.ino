@@ -56,6 +56,7 @@ String trangThaiLid = "DONG";
 
 bool lastLidState = false; 
 bool lastTrashFullState = false; 
+bool dfplayerReady = false; // Cờ kiểm tra DFPlayer đã sẵn sàng chưa
 
 // Ký tự độ C đặc biệt hiển thị trên LCD
 byte kyTuDoC[8] = {
@@ -127,9 +128,11 @@ void setup() {
   delay(10);
   if (!myDFPlayer.begin(dfSerial)) {
     Serial.println(F("Khong ket noi duoc DFPlayer! Kiem tra day cam hoac the nho."));
+    dfplayerReady = false;
   } else {
     Serial.println(F("DFPlayer da san sang."));
     myDFPlayer.volume(volumeVal);  // Đặt âm lượng lấy từ bộ nhớ EEPROM
+    dfplayerReady = true;
   }
 
   // Chuyển sang lắng nghe tín hiệu điều khiển từ ESP8266
@@ -300,7 +303,7 @@ void loop() {
   bool currentTrashFull = (intGarbageLevel >= nguongDayRac);
 
   // 3.5.1 Lệnh còi hú từ giao diện Web ghi đè
-  if (manualAlarm != lastManualAlarm) {
+  if (dfplayerReady && (manualAlarm != lastManualAlarm)) {
     dfSerial.listen();
     delay(10);
     if (manualAlarm) {
@@ -313,10 +316,12 @@ void loop() {
     delay(10);
     espSerial.listen(); // Trả lại quyền nghe lệnh cho ESP
     lastManualAlarm = manualAlarm;
+  } else if (!dfplayerReady) {
+    lastManualAlarm = manualAlarm; // Cập nhật trạng thái để tránh lặp
   }
 
   // 3.5.2 Chế độ tự động phát âm thanh khi còi hú tắt
-  if (!manualAlarm) {
+  if (dfplayerReady && !manualAlarm) {
     // Trạng thái nắp thay đổi (Mở hoặc Đóng)
     if (shouldOpen != lastLidState) {
       dfSerial.listen();
@@ -350,6 +355,17 @@ void loop() {
       }
       lastTrashFullState = currentTrashFull;
     }
+  } else if (!dfplayerReady) {
+    // Nếu không cắm loa, chỉ in log debug chứ không gọi lệnh âm thanh
+    if (shouldOpen != lastLidState) {
+      if (shouldOpen) {
+        Serial.println(F("⚠️ [DEBUG LOA] -> Nap MO (Bỏ qua phát nhạc vì chưa cắm loa)"));
+      } else {
+        Serial.println(F("⚠️ [DEBUG LOA] -> Nap DONG (Bỏ qua phát nhạc vì chưa cắm loa)"));
+      }
+      lastLidState = shouldOpen;
+    }
+    lastTrashFullState = currentTrashFull;
   }
 
   // ====== BUOC 4 & 5: HIỂN THỊ LCD VÀ GỬI JSON (1 GIÂY/LẦN) ======
