@@ -44,17 +44,16 @@ DHT dht(DHTPIN, DHTTYPE);
 Servo servoNapThung; 
 
 // ====== CẤU HÌNH BIẾN TOÀN CỤC ======
-float nhietDo = 0.0;
-float doAm = 0.0;
-int intGasValue = 0; 
+unsigned long handDuration, garbageDuration;
+float handDistance, garbageDistance;
+int intGarbageLevel;
+int intGasValue;
+float nhietDo, doAm;
 
-long handDuration = 0;
-float handDistance = 0.0; 
+unsigned long lidOpenTimer = 0; // Thêm biến đếm thời gian giữ nắp mở
+const unsigned long LID_HOLD_TIME = 3000; // Thời gian giữ nắp mở (3 giây)
 String trangThaiLid = "DONG";
 
-long garbageDuration = 0;
-int garbageDistance = 0; 
-int intGarbageLevel = 0; 
 bool lastLidState = false; 
 bool lastTrashFullState = false; 
 
@@ -259,8 +258,19 @@ void loop() {
   } else if (manualCommand == "close") {
     shouldOpen = false;
   } else {
-    // Chế độ tự động
-    shouldOpen = (handDistance > 0 && handDistance < NGHUONG_KHOANG_CACH);
+    // Chế độ tự động: Có tay thì mở và cập nhật mốc thời gian
+    if (handDistance > 0 && handDistance < NGHUONG_KHOANG_CACH) {
+      shouldOpen = true;
+      lidOpenTimer = millis(); // Ghi nhớ thời điểm cuối cùng nhìn thấy tay
+    } 
+    // Nếu không thấy tay, nhưng chưa hết 3 giây chờ -> vẫn giữ mở
+    else if (millis() - lidOpenTimer < LID_HOLD_TIME) {
+      shouldOpen = true;
+    } 
+    // Hết thời gian chờ -> đóng nắp
+    else {
+      shouldOpen = false;
+    }
   }
 
   // Điều khiển Servo và cập nhật trạng thái
@@ -313,15 +323,15 @@ void loop() {
       delay(10);
       if (shouldOpen) {
         if (currentTrashFull) {
-          Serial.println(F("🔊 [LOA] -> Thung rac DAY! Phat canh bao (Bai 1)..."));
-          myDFPlayer.loop(1);
+          Serial.println(F("🔊 [LOA] -> Thung rac DAY! Phat canh bao (Bai 4)..."));
+          myDFPlayer.play(4);
         } else {
-          Serial.println(F("🔊 [LOA] -> Nap MO! Phat nhac chao mung (Bai 1)..."));
-          myDFPlayer.loop(1);
+          Serial.println(F("🔊 [LOA] -> Nap MO! Xin moi ban bo rac (Bai 2)..."));
+          myDFPlayer.play(2);
         }
       } else {
-        Serial.println(F("🔇 [LOA] -> Nap DONG! Dung phat nhac."));
-        myDFPlayer.stop();
+        Serial.println(F("🔊 [LOA] -> Nap DONG! Xin cam on da bo rac (Bai 3)."));
+        myDFPlayer.play(3);
       }
       delay(10);
       espSerial.listen(); // Trả lại quyền nghe lệnh cho ESP
@@ -333,8 +343,8 @@ void loop() {
       if (currentTrashFull && !shouldOpen) {
         dfSerial.listen();
         delay(10);
-        Serial.println(F("🔊 [LOA] -> Thung rac VU DAY! Phat canh bao mot lan (Bai 1)..."));
-        myDFPlayer.play(1);
+        Serial.println(F("🔊 [LOA] -> Thung rac VUA DAY! Phat canh bao mot lan (Bai 4)..."));
+        myDFPlayer.play(4);
         delay(10);
         espSerial.listen(); // Trả lại quyền nghe lệnh cho ESP
       }
