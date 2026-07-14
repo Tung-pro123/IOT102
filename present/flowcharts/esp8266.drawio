@@ -1,0 +1,111 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="ESP8266 - loop() &amp; callback()" id="esp8266Loop">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="2800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="start" value="Bắt đầu" style="terminator;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1"><mxGeometry x="300" y="40" width="160" height="50" as="geometry" /></mxCell>
+        <mxCell id="setup" value="Khởi tạo Serial, arduinoSerial.&lt;br&gt;Kết nối WiFi (chờ đến khi thành công).&lt;br&gt;Cấu hình MQTT server + đăng ký callback().&lt;br&gt;Khởi tạo bộ giải mã âm thanh I2S" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="200" y="130" width="360" height="110" as="geometry" /></mxCell>
+        <mxCell id="loopB" value="B" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="360" y="280" width="40" height="40" as="geometry" /></mxCell>
+
+        <mxCell id="d1" value="Đã kết nối MQTT?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="260" y="360" width="240" height="90" as="geometry" /></mxCell>
+        <mxCell id="p1" value="reconnect(): thử kết nối lại,&lt;br&gt;subscribe topic control,&lt;br&gt;chờ 5s nếu thất bại" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="620" y="355" width="300" height="100" as="geometry" /></mxCell>
+        <mxCell id="p2" value="client.loop(): xử lý nền MQTT&lt;br&gt;(gọi callback() nếu có tin nhắn mới)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="240" y="500" width="280" height="80" as="geometry" /></mxCell>
+
+        <mxCell id="d2" value="Còi RTTTL&lt;br&gt;đang phát?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="260" y="620" width="240" height="90" as="geometry" /></mxCell>
+        <mxCell id="d3" value="Đã phát xong&lt;br&gt;bài còi?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="620" y="620" width="220" height="90" as="geometry" /></mxCell>
+        <mxCell id="p3" value="Dừng còi, giải phóng&lt;br&gt;bộ nhớ file" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="620" y="750" width="240" height="70" as="geometry" /></mxCell>
+        <mxCell id="m1" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="365" y="760" width="30" height="30" as="geometry" /></mxCell>
+
+        <mxCell id="d4" value="Có dữ liệu JSON&lt;br&gt;mới từ Arduino?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="260" y="830" width="240" height="90" as="geometry" /></mxCell>
+        <mxCell id="d5" value="JSON hợp lệ?&lt;br&gt;(bắt đầu { kết thúc })" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="250" y="960" width="260" height="90" as="geometry" /></mxCell>
+        <mxCell id="p4" value="In lỗi debug" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="620" y="965" width="200" height="60" as="geometry" /></mxCell>
+        <mxCell id="io1" value="Publish JSON nguyên văn&lt;br&gt;lên topic sensor_data" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1"><mxGeometry x="250" y="1090" width="280" height="80" as="geometry" /></mxCell>
+        <mxCell id="p5" value="Parse JSON lấy&lt;br&gt;garbage_level, gas" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="260" y="1210" width="260" height="70" as="geometry" /></mxCell>
+        <mxCell id="d6" value="garbage_level ≥ ngưỡng&lt;br&gt;HOẶC gas &gt; ngưỡng?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="240" y="1320" width="280" height="100" as="geometry" /></mxCell>
+        <mxCell id="d7" value="Còi chưa chạy VÀ đã qua&lt;br&gt;≥ 5 giây từ lần hú trước?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="230" y="1460" width="300" height="100" as="geometry" /></mxCell>
+        <mxCell id="p6" value="Nạp file còi, bắt đầu phát&lt;br&gt;còi tự động (I2S / RTTTL)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="230" y="1600" width="300" height="80" as="geometry" /></mxCell>
+
+        <mxCell id="startCB" value="Sự kiện: nhận tin nhắn MQTT&lt;br&gt;trên topic smarthome/bin/control" style="terminator;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1"><mxGeometry x="240" y="1790" width="340" height="70" as="geometry" /></mxCell>
+        <mxCell id="pcbParse" value="Parse JSON lấy trường 'command'" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="260" y="1900" width="300" height="60" as="geometry" /></mxCell>
+        <mxCell id="dcbOk" value="Parse thành công&lt;br&gt;và có 'command'?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="270" y="2000" width="260" height="90" as="geometry" /></mxCell>
+        <mxCell id="pcbErr" value="In lỗi debug" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="640" y="2005" width="200" height="60" as="geometry" /></mxCell>
+        <mxCell id="endCB" value="Kết thúc callback" style="terminator;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1"><mxGeometry x="640" y="2110" width="220" height="60" as="geometry" /></mxCell>
+
+        <mxCell id="iocbFwd" value="Forward 'CMD:&lt;command&gt;'&lt;br&gt;xuống Arduino qua arduinoSerial" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1"><mxGeometry x="250" y="2130" width="320" height="80" as="geometry" /></mxCell>
+        <mxCell id="dcbPlay" value="command ==&lt;br&gt;'play_alarm'?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="270" y="2250" width="240" height="90" as="geometry" /></mxCell>
+        <mxCell id="dcbIdle" value="Còi I2S&lt;br&gt;chưa chạy?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="620" y="2250" width="220" height="90" as="geometry" /></mxCell>
+        <mxCell id="pcbStart" value="Nạp file còi,&lt;br&gt;bắt đầu phát qua I2S" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="620" y="2380" width="240" height="70" as="geometry" /></mxCell>
+        <mxCell id="mcbA" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="375" y="2390" width="30" height="30" as="geometry" /></mxCell>
+
+        <mxCell id="dcbStop" value="command ==&lt;br&gt;'stop_alarm'?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="270" y="2450" width="240" height="90" as="geometry" /></mxCell>
+        <mxCell id="dcbRunning" value="Còi I2S&lt;br&gt;đang chạy?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="620" y="2450" width="220" height="90" as="geometry" /></mxCell>
+        <mxCell id="pcbStop" value="Dừng còi,&lt;br&gt;giải phóng bộ nhớ" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="620" y="2580" width="220" height="70" as="geometry" /></mxCell>
+        <mxCell id="mcbB" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="375" y="2590" width="30" height="30" as="geometry" /></mxCell>
+
+        <mxCell id="dcbConfig" value="command bắt đầu&lt;br&gt;bằng 'config:'?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="260" y="2650" width="260" height="90" as="geometry" /></mxCell>
+        <mxCell id="pcbConfig" value="Parse 4 số đầu (trash, gas,...)&lt;br&gt;cập nhật biến cục bộ báo động" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1"><mxGeometry x="620" y="2655" width="300" height="80" as="geometry" /></mxCell>
+
+        <mxCell id="e-start-setup" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="start" target="setup"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-setup-loopB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="setup" target="loopB"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-loopB-d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="loopB" target="d1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-d1-p1" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="d1" target="p1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-p1-d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.5;exitY=0;entryX=1;entryY=0.2;" edge="1" parent="1" source="p1" target="d1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-d1-p2" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="d1" target="p2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-p2-d2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="p2" target="d2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-d2-d3" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="d2" target="d3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-d2-m1" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="d2" target="m1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-d3-p3" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="d3" target="p3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-d3-m1" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="d3" target="m1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-p3-m1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="p3" target="m1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-m1-d4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="m1" target="d4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-d4-loopB" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="d4" target="loopB">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1050" y="875" /><mxPoint x="1050" y="300" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e-d4-d5" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="d4" target="d5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-d5-p4" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="d5" target="p4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-p4-loopB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.5;entryX=1;entryY=0.6;" edge="1" parent="1" source="p4" target="loopB">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1050" y="995" /><mxPoint x="1050" y="310" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e-d5-io1" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="d5" target="io1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-io1-p5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="io1" target="p5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-p5-d6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="p5" target="d6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-d6-loopB" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;exitX=1;exitY=0.5;entryX=1;entryY=0.7;" edge="1" parent="1" source="d6" target="loopB">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1050" y="1370" /><mxPoint x="1050" y="320" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e-d6-d7" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="d6" target="d7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-d7-loopB" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;exitX=1;exitY=0.5;entryX=1;entryY=0.8;" edge="1" parent="1" source="d7" target="loopB">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1050" y="1510" /><mxPoint x="1050" y="330" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e-d7-p6" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="d7" target="p6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-p6-loopB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.5;entryX=0.8;entryY=1;" edge="1" parent="1" source="p6" target="loopB">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1050" y="1640" /><mxPoint x="1050" y="340" /></Array></mxGeometry>
+        </mxCell>
+
+        <mxCell id="e-startCB-pcbParse" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="startCB" target="pcbParse"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-pcbParse-dcbOk" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="pcbParse" target="dcbOk"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbOk-pcbErr" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbOk" target="pcbErr"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-pcbErr-endCB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="pcbErr" target="endCB"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbOk-iocbFwd" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbOk" target="iocbFwd"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-iocbFwd-dcbPlay" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="iocbFwd" target="dcbPlay"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbPlay-dcbIdle" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbPlay" target="dcbIdle"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbPlay-mcbA" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbPlay" target="mcbA"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbIdle-pcbStart" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbIdle" target="pcbStart"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbIdle-mcbA" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbIdle" target="mcbA"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-pcbStart-mcbA" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="pcbStart" target="mcbA"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-mcbA-dcbStop" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="mcbA" target="dcbStop"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbStop-dcbRunning" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbStop" target="dcbRunning"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbStop-mcbB" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbStop" target="mcbB"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbRunning-pcbStop" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbRunning" target="pcbStop"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbRunning-mcbB" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbRunning" target="mcbB"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-pcbStop-mcbB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="pcbStop" target="mcbB"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-mcbB-dcbConfig" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="mcbB" target="dcbConfig"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbConfig-pcbConfig" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbConfig" target="pcbConfig"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dcbConfig-endCB" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="dcbConfig" target="endCB"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-pcbConfig-endCB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="pcbConfig" target="endCB"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

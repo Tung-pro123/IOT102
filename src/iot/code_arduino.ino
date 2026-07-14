@@ -52,8 +52,14 @@ unsigned long lidOpenTimer = 0; // Thêm biến đếm thời gian giữ nắp m
 const unsigned long LID_HOLD_TIME = 3000; // Thời gian giữ nắp mở (3 giây)
 String trangThaiLid = "DONG";
 
-bool lastLidState = false; 
-bool lastTrashFullState = false; 
+bool lastLidState = false;
+bool lastTrashFullState = false;
+
+// ====== GIÃN CÁCH LỆNH LOA SO VỚI LỆNH SERVO (giảm đỉnh dòng đồng thời servo+loa trên nguồn chung) ======
+bool soundPending = false;
+int pendingTrack = 0;
+unsigned long soundScheduledAt = 0;
+const unsigned long SOUND_STAGGER_DELAY = 250; // (ms) trễ phát loa sau khi servo bắt đầu quay
 
 // Ký tự độ C đặc biệt hiển thị trên LCD
 byte kyTuDoC[8] = {
@@ -324,6 +330,7 @@ void loop() {
     if (manualAlarm) {
       Serial.println(F("🔊 [LOA BÁO ĐỘNG] -> Kích hoạt từ Web! Vòng lặp Bài 1..."));
       myDFPlayer.loop(1);
+      soundPending = false; // Hủy âm thanh tự động đang chờ (nếu có) để không đè lên còi báo động
     } else {
       Serial.println(F("🔇 [LOA BÁO ĐỘNG] -> Tắt còi báo động từ Web!"));
       myDFPlayer.stop();
@@ -335,24 +342,17 @@ void loop() {
 
   // 3.5.2 Chế độ tự động phát âm thanh khi còi hú tắt
   if (!manualAlarm) {
-    // Trạng thái nắp thay đổi (Mở hoặc Đóng)
+    // Trạng thái nắp thay đổi (Mở hoặc Đóng) -> CHỈ LÊN LỊCH phát loa, chưa phát ngay.
+    // Servo vừa được lệnh quay ở BUOC 2 trong cùng vòng lặp này (dòng khởi động servo đang ở đỉnh);
+    // dời lệnh phát loa ra sau SOUND_STAGGER_DELAY để đỉnh dòng servo + loa không cộng dồn trên nguồn chung.
     if (shouldOpen != lastLidState) {
-      dfSerial.listen();
-      delay(10);
       if (shouldOpen) {
-        if (currentTrashFull) {
-          Serial.println(F("🔊 [LOA] -> Thung rac DAY! Phat canh bao (Bai 4)..."));
-          myDFPlayer.play(4);
-        } else {
-          Serial.println(F("🔊 [LOA] -> Nap MO! Xin moi ban bo rac (Bai 2)..."));
-          myDFPlayer.play(2);
-        }
+        pendingTrack = currentTrashFull ? 4 : 2;
       } else {
-        Serial.println(F("🔊 [LOA] -> Nap DONG! Xin cam on da bo rac (Bai 3)."));
-        myDFPlayer.play(3);
+        pendingTrack = 3;
       }
-      delay(10);
-      espSerial.listen(); // Trả lại quyền nghe lệnh cho ESP
+      soundPending = true;
+      soundScheduledAt = millis() + SOUND_STAGGER_DELAY;
       lastLidState = shouldOpen;
     }
 
@@ -368,6 +368,29 @@ void loop() {
       }
       lastTrashFullState = currentTrashFull;
     }
+  }
+
+  // 3.6 THỰC THI LỆNH LOA ĐÃ LÊN LỊCH (sau khi servo đã kịp bắt đầu quay được một chút)
+  if (soundPending && !manualAlarm && millis() >= soundScheduledAt) {
+    dfSerial.listen();
+    delay(10);
+    switch (pendingTrack) {
+      case 2:
+        Serial.println(F("🔊 [LOA] -> Nap MO! Xin moi ban bo rac (Bai 2)..."));
+        myDFPlayer.play(2);
+        break;
+      case 3:
+        Serial.println(F("🔊 [LOA] -> Nap DONG! Xin cam on da bo rac (Bai 3)."));
+        myDFPlayer.play(3);
+        break;
+      case 4:
+        Serial.println(F("🔊 [LOA] -> Thung rac DAY! Phat canh bao (Bai 4)..."));
+        myDFPlayer.play(4);
+        break;
+    }
+    delay(10);
+    espSerial.listen(); // Trả lại quyền nghe lệnh cho ESP
+    soundPending = false;
   }
 
   // ====== BUOC 4 & 5: HIỂN THỊ LCD VÀ GỬI JSON (1 GIÂY/LẦN) ======

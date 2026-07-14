@@ -1,0 +1,48 @@
+flowchart TD
+    Start(["Bắt đầu"]) --> Setup["Khởi tạo Serial, arduinoSerial.<br/>Kết nối WiFi (chờ đến khi thành công).<br/>Cấu hình MQTT server + đăng ký callback().<br/>Khởi tạo bộ giải mã âm thanh I2S"]
+    Setup --> LoopB(("B"))
+    LoopB --> D1{"Đã kết nối MQTT?"}
+    D1 -->|Không| P1["reconnect(): thử kết nối lại,<br/>subscribe topic control,<br/>chờ 5s nếu thất bại"]
+    P1 --> D1
+    D1 -->|Có| P2["client.loop(): xử lý nền MQTT<br/>(gọi callback() nếu có tin nhắn mới)"]
+    P2 --> D2{"Còi RTTTL<br/>đang phát?"}
+    D2 -->|Có| D3{"Đã phát xong<br/>bài còi?"}
+    D3 -->|Có| P3["Dừng còi, giải phóng<br/>bộ nhớ file"]
+    D3 -->|Không| M1((" "))
+    P3 --> M1
+    D2 -->|Không| M1
+    M1 --> D4{"Có dữ liệu JSON<br/>mới từ Arduino?"}
+    D4 -->|Không| LoopB
+    D4 -->|Có| D5{"JSON hợp lệ?<br/>(bắt đầu { kết thúc })"}
+    D5 -->|Không| P4["In lỗi debug"]
+    P4 --> LoopB
+    D5 -->|Có| IO1[/"Publish JSON nguyên văn<br/>lên topic sensor_data"/]
+    IO1 --> P5["Parse JSON lấy<br/>garbage_level, gas"]
+    P5 --> D6{"garbage_level ≥ ngưỡng<br/>HOẶC gas > ngưỡng?"}
+    D6 -->|Không| LoopB
+    D6 -->|Có| D7{"Còi chưa chạy VÀ đã qua<br/>≥ 5 giây từ lần hú trước?"}
+    D7 -->|Không| LoopB
+    D7 -->|Có| P6["Nạp file còi, bắt đầu phát<br/>còi tự động (I2S / RTTTL)"]
+    P6 --> LoopB
+
+    StartCB(["Sự kiện: nhận tin nhắn MQTT<br/>trên topic smarthome/bin/control"]) --> PcbParse["Parse JSON lấy trường 'command'"]
+    PcbParse --> DcbOk{"Parse thành công<br/>và có 'command'?"}
+    DcbOk -->|Không| PcbErr["In lỗi debug"]
+    PcbErr --> EndCB(["Kết thúc callback"])
+    DcbOk -->|Có| IOcbFwd[/"Forward 'CMD:&lt;command&gt;'<br/>xuống Arduino qua arduinoSerial"/]
+    IOcbFwd --> DcbPlay{"command ==<br/>'play_alarm'?"}
+    DcbPlay -->|Có| DcbIdle{"Còi I2S<br/>chưa chạy?"}
+    DcbIdle -->|Có| PcbStart["Nạp file còi,<br/>bắt đầu phát qua I2S"]
+    DcbIdle -->|Không| McbA((" "))
+    PcbStart --> McbA
+    DcbPlay -->|Không| McbA
+    McbA --> DcbStop{"command ==<br/>'stop_alarm'?"}
+    DcbStop -->|Có| DcbRunning{"Còi I2S<br/>đang chạy?"}
+    DcbRunning -->|Có| PcbStop["Dừng còi,<br/>giải phóng bộ nhớ"]
+    DcbRunning -->|Không| McbB((" "))
+    PcbStop --> McbB
+    DcbStop -->|Không| McbB
+    McbB --> DcbConfig{"command bắt đầu<br/>bằng 'config:'?"}
+    DcbConfig -->|Có| PcbConfig["Parse 4 số đầu (trash, gas,...)<br/>cập nhật biến cục bộ báo động"]
+    DcbConfig -->|Không| EndCB
+    PcbConfig --> EndCB

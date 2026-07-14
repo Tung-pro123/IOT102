@@ -1,0 +1,55 @@
+flowchart TD
+    Start(["Bắt đầu"]) --> Setup["Đọc cấu hình từ EEPROM.<br/>Khởi tạo Serial, ESP-Serial, DFPlayer,<br/>cảm biến, Servo (đóng), LCD"]
+    Setup --> LoopA(("A"))
+    LoopA --> D1{"Có lệnh mới từ ESP8266?"}
+    D1 -->|Có| P1["Cập nhật manualCommand / manualAlarm,<br/>hoặc lưu config mới vào EEPROM"]
+    D1 -->|Không| M1((" "))
+    P1 --> M1
+    M1 --> D2{"Đến hạn đọc cảm biến<br/>môi trường? (≥ 2 giây)"}
+    D2 -->|Có| IO1[/"Đọc DHT11 (nhiệt độ, độ ẩm)<br/>Đọc MQ-135 (gas)"/]
+    D2 -->|Không| M2((" "))
+    IO1 --> M2
+    M2 --> P2["Đo khoảng cách tay<br/>(HC-SR04 #1)"]
+    P2 --> D3{"manualCommand?"}
+    D3 -->|open| S1["shouldOpen = true"]
+    D3 -->|close| S2["shouldOpen = false"]
+    D3 -->|auto| D4{"Tay trong ngưỡng mở nắp<br/>HOẶC còn trong 3s giữ?"}
+    D4 -->|Có| S3["shouldOpen = true<br/>lưu mốc thời gian"]
+    D4 -->|Không| S4["shouldOpen = false"]
+    S1 --> M3((" "))
+    S2 --> M3
+    S3 --> M3
+    S4 --> M3
+    M3 --> P3["Điều khiển Servo:<br/>mở/đóng nắp theo shouldOpen"]
+    P3 --> P4["Đo khoảng cách rác<br/>(HC-SR04 #2)"]
+    P4 --> D5{"Echo hợp lệ?<br/>(không time-out)"}
+    D5 -->|Có| P5["Tính % rác bằng nội suy<br/>float + constrain 0-100"]
+    D5 -->|Không| P6["Giữ nguyên % rác cũ"]
+    P5 --> M4((" "))
+    P6 --> M4
+    M4 --> D6{"Lệnh còi thủ công<br/>vừa thay đổi?"}
+    D6 -->|Có| P7["Phát / Dừng còi báo động<br/>(Track 1 loop / stop)"]
+    D6 -->|Không| M5((" "))
+    P7 --> M5
+    M5 --> D7{"Đang KHÔNG phát<br/>còi thủ công?"}
+    D7 -->|Không| M6((" "))
+    D7 -->|Có| D8{"Trạng thái nắp<br/>vừa đổi (mở/đóng)?"}
+    D8 -->|Không| D9{"Rác vừa chuyển sang đầy<br/>VÀ nắp đang đóng?"}
+    D8 -->|Có| D8b{"shouldOpen<br/>(đang mở)?"}
+    D8b -->|Không, vừa đóng| P10["Phát Track 3<br/>(cảm ơn)"]
+    D8b -->|Có| D8c{"Rác đầy?"}
+    D8c -->|Có| P8["Phát Track 4<br/>(cảnh báo đầy)"]
+    D8c -->|Không| P9["Phát Track 2<br/>(mời bỏ rác)"]
+    P8 --> D9
+    P9 --> D9
+    P10 --> D9
+    D9 -->|Có| P11["Phát Track 4<br/>(một lần)"]
+    D9 -->|Không| M6
+    P11 --> M6
+    M6 --> D10{"Đến hạn gửi dữ liệu?<br/>(≥ 1 giây)"}
+    D10 -->|Không| LoopA
+    D10 -->|Có| P12["Hiển thị LCD: nhiệt độ,<br/>độ ẩm, gas, trạng thái nắp, % rác"]
+    P12 --> IO2[/"Đóng gói JSON và gửi<br/>qua espSerial tới ESP8266"/]
+    IO2 --> P13["In debug ra Serial Monitor"]
+    P13 --> P14["Delay 30ms"]
+    P14 --> LoopA
