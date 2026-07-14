@@ -39,12 +39,16 @@ function App() {
   const [gasThreshold, setGasThreshold] = useState(() => Number(localStorage.getItem('gasThreshold')) || 500)
   const [binHeight, setBinHeight] = useState(() => Number(localStorage.getItem('binHeight')) || 25)
   const [speakerVolume, setSpeakerVolume] = useState(() => Number(localStorage.getItem('speakerVolume')) || 18)
+  const [fullThresholdCm, setFullThresholdCm] = useState(() => Number(localStorage.getItem('fullThresholdCm')) || 5)
+  const [lidOpenDistanceCm, setLidOpenDistanceCm] = useState(() => Number(localStorage.getItem('lidOpenDistanceCm')) || 15)
 
   // Settings Temp States (for editing in Modal)
   const [tempTrashThreshold, setTempTrashThreshold] = useState(trashThreshold)
   const [tempGasThreshold, setTempGasThreshold] = useState(gasThreshold)
   const [tempBinHeight, setTempBinHeight] = useState(binHeight)
   const [tempSpeakerVolume, setTempSpeakerVolume] = useState(speakerVolume)
+  const [tempFullThresholdCm, setTempFullThresholdCm] = useState(fullThresholdCm)
+  const [tempLidOpenDistanceCm, setTempLidOpenDistanceCm] = useState(lidOpenDistanceCm)
 
   // Modal & Dropdown visibility
   const [showNotifications, setShowNotifications] = useState(false)
@@ -57,8 +61,10 @@ function App() {
       setTempGasThreshold(gasThreshold)
       setTempBinHeight(binHeight)
       setTempSpeakerVolume(speakerVolume)
+      setTempFullThresholdCm(fullThresholdCm)
+      setTempLidOpenDistanceCm(lidOpenDistanceCm)
     }
-  }, [showSettings, trashThreshold, gasThreshold, binHeight, speakerVolume])
+  }, [showSettings, trashThreshold, gasThreshold, binHeight, speakerVolume, fullThresholdCm, lidOpenDistanceCm])
 
   // Notifications list
   const [notifications, setNotifications] = useState([
@@ -514,12 +520,38 @@ function App() {
               {/* Âm lượng DFPlayer */}
               <div>
                 <label className="block font-semibold mb-1 text-left">Âm lượng loa DFPlayer (0-30): {tempSpeakerVolume}</label>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="30" 
-                  value={tempSpeakerVolume} 
+                <input
+                  type="range"
+                  min="0"
+                  max="30"
+                  value={tempSpeakerVolume}
                   onChange={(e) => setTempSpeakerVolume(Number(e.target.value))}
+                  className="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600 animate-none"
+                />
+              </div>
+
+              {/* Ngưỡng khoảng cách coi là đầy 100% */}
+              <div>
+                <label className="block font-semibold mb-1 text-left">Khoảng cách coi là đầy 100% (cm): {tempFullThresholdCm}</label>
+                <input
+                  type="range"
+                  min="2"
+                  max="15"
+                  value={tempFullThresholdCm}
+                  onChange={(e) => setTempFullThresholdCm(Number(e.target.value))}
+                  className="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600 animate-none"
+                />
+              </div>
+
+              {/* Ngưỡng khoảng cách mở nắp tự động khi có tay */}
+              <div>
+                <label className="block font-semibold mb-1 text-left">Khoảng cách mở nắp khi có tay (cm): {tempLidOpenDistanceCm}</label>
+                <input
+                  type="range"
+                  min="5"
+                  max="40"
+                  value={tempLidOpenDistanceCm}
+                  onChange={(e) => setTempLidOpenDistanceCm(Number(e.target.value))}
                   className="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600 animate-none"
                 />
               </div>
@@ -540,14 +572,18 @@ function App() {
                   setGasThreshold(tempGasThreshold);
                   setBinHeight(tempBinHeight);
                   setSpeakerVolume(tempSpeakerVolume);
+                  setFullThresholdCm(tempFullThresholdCm);
+                  setLidOpenDistanceCm(tempLidOpenDistanceCm);
                   localStorage.setItem('trashThreshold', tempTrashThreshold);
                   localStorage.setItem('gasThreshold', tempGasThreshold);
                   localStorage.setItem('binHeight', tempBinHeight);
                   localStorage.setItem('speakerVolume', tempSpeakerVolume);
-                  
-                  // Publish MQTT config payload
-                  publishControl(`config:${tempTrashThreshold}:${tempGasThreshold}:${tempBinHeight}:${tempSpeakerVolume}`);
-                  
+                  localStorage.setItem('fullThresholdCm', tempFullThresholdCm);
+                  localStorage.setItem('lidOpenDistanceCm', tempLidOpenDistanceCm);
+
+                  // Publish MQTT config payload: trash:gas:height:vol:fullCm:openCm
+                  publishControl(`config:${tempTrashThreshold}:${tempGasThreshold}:${tempBinHeight}:${tempSpeakerVolume}:${tempFullThresholdCm}:${tempLidOpenDistanceCm}`);
+
                   setShowSettings(false);
                 }}
                 className={`flex-1 py-2 text-xs font-bold rounded-xl text-white transition ${

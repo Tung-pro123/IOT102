@@ -31,12 +31,10 @@ DFRobotDFPlayerMini myDFPlayer;
 // ====== ĐỊNH NGHĨA CÁC THÔNG SỐ ======
 #define DHTTYPE DHT11  
 
-// Ngưỡng khoảng cách (cm) để mở nắp tự động
-const int NGHUONG_KHOANG_CACH = 15; 
-
-// Góc quay Servo
-const int GOC_MO_NAP = 120;   
-const int GOC_DONG_NAP = 40;   
+// Góc quay Servo (đã hoán đổi 2 giá trị cho khớp chiều lắp cơ khí thực tế —
+// trước đó GOC_MO_NAP/GOC_DONG_NAP bị ngược khiến nắp đóng khi có tay, mở khi không có tay)
+const int GOC_MO_NAP = 40;
+const int GOC_DONG_NAP = 120;
 
 // ====== KHỞI TẠO ĐỐI TƯỢNG ======
 LiquidCrystal_I2C lcd(0x27, 16, 2); 
@@ -74,11 +72,13 @@ bool lastManualAlarm = false;
 
 // ====== ĐỊNH NGHĨA STRUCT ĐỂ LƯU CẤU HÌNH VÀO EEPROM VĨNH VIỄN ======
 struct ConfigData {
-  byte signature;       // Chữ ký xác nhận đã cấu hình (ví dụ 0xAA)
+  byte signature;       // Chữ ký xác nhận đã cấu hình (0xAB — đổi từ 0xAA vì struct đổi kích thước)
   byte nguongDayRac;    // Ngưỡng đầy rác
   int nguongGas;        // Ngưỡng khí gas (kiểu int chiếm 2 byte)
   byte binHeightVal;    // Chiều cao thùng
   byte volumeVal;       // Âm lượng loa
+  byte nguongDayCm;     // Khoảng cách (cm) coi là rác đầy 100%
+  byte nguongMoNapCm;   // Khoảng cách (cm) để tự động mở nắp khi có tay
 } myConfig;
 
 // Các biến cấu hình động được gán từ bộ nhớ EEPROM hoặc mặc định
@@ -86,6 +86,8 @@ int nguongDayRac;
 int nguongGas;
 int binHeightVal;
 int volumeVal;
+int nguongDayCm;
+int nguongMoNapCm;
 
 void setup() {
   Serial.begin(9600);
@@ -93,29 +95,36 @@ void setup() {
   
   // --- ĐỌC CẤU HÌNH VĨNH VIỄN TỪ EEPROM ---
   EEPROM.get(0, myConfig);
-  if (myConfig.signature != 0xAA) {
-    // Nếu chưa từng cấu hình từ Web (chưa có chữ ký 0xAA), thiết lập mặc định
+  if (myConfig.signature != 0xAB) {
+    // Nếu chưa từng cấu hình từ Web (chưa có chữ ký 0xAB), thiết lập mặc định
     Serial.println(F("💾 EEPROM trống! Đang thiết lập cấu hình mặc định ban đầu..."));
-    myConfig.signature = 0xAA;
+    myConfig.signature = 0xAB;
     myConfig.nguongDayRac = 80;
     myConfig.nguongGas = 500;
     myConfig.binHeightVal = 25;
     myConfig.volumeVal = 18;
+    myConfig.nguongDayCm = 5;
+    myConfig.nguongMoNapCm = 15;
     EEPROM.put(0, myConfig); // Lưu lại cấu hình mặc định vào EEPROM
   } else {
     Serial.println(F("💾 Đã tìm thấy cấu hình cũ lưu trong bộ nhớ EEPROM!"));
   }
-  
+
   // Gán cấu hình động từ struct ra các biến sử dụng trong chương trình
   nguongDayRac = myConfig.nguongDayRac;
   nguongGas = myConfig.nguongGas;
   binHeightVal = myConfig.binHeightVal;
   volumeVal = myConfig.volumeVal;
+  nguongDayCm = myConfig.nguongDayCm;
+  nguongMoNapCm = myConfig.nguongMoNapCm;
 
   Serial.print(F("🔧 Cấu hình hiện tại - Rác: ")); Serial.print(nguongDayRac);
   Serial.print(F("%, Gas: ")); Serial.print(nguongGas);
   Serial.print(F("ppm, Cao: ")); Serial.print(binHeightVal);
-  Serial.print(F("cm, Vol: ")); Serial.println(volumeVal);
+  Serial.print(F("cm, Vol: ")); Serial.print(volumeVal);
+  Serial.print(F(", Day: ")); Serial.print(nguongDayCm);
+  Serial.print(F("cm, MoNap: ")); Serial.print(nguongMoNapCm);
+  Serial.println(F("cm"));
 
   espSerial.begin(9600); // Khởi động Serial sang ESP8266
   
@@ -191,23 +200,27 @@ void loop() {
         manualAlarm = false;
       } 
       
-      // XỬ LÝ LỆNH CẤU HÌNH ĐỘNG TỪ WEB VÀ LƯU VÀO EEPROM: config:trash:gas:height:vol
+      // XỬ LÝ LỆNH CẤU HÌNH ĐỘNG TỪ WEB VÀ LƯU VÀO EEPROM: config:trash:gas:height:vol:fullCm:openCm
       else if (command.startsWith("config:")) {
-        char tempBuf[40];
-        command.toCharArray(tempBuf, 40);
-        int trash, gas, height, vol;
-        if (sscanf(tempBuf, "config:%d:%d:%d:%d", &trash, &gas, &height, &vol) == 4) {
+        char tempBuf[48];
+        command.toCharArray(tempBuf, 48);
+        int trash, gas, height, vol, fullCm, openCm;
+        if (sscanf(tempBuf, "config:%d:%d:%d:%d:%d:%d", &trash, &gas, &height, &vol, &fullCm, &openCm) == 6) {
           nguongDayRac = trash;
           nguongGas = gas;
           binHeightVal = height;
           volumeVal = vol;
-          
+          nguongDayCm = fullCm;
+          nguongMoNapCm = openCm;
+
           // Ghi đè cấu hình mới vào struct
           myConfig.nguongDayRac = nguongDayRac;
           myConfig.nguongGas = nguongGas;
           myConfig.binHeightVal = binHeightVal;
           myConfig.volumeVal = volumeVal;
-          
+          myConfig.nguongDayCm = nguongDayCm;
+          myConfig.nguongMoNapCm = nguongMoNapCm;
+
           // Ghi cấu hình mới vĩnh viễn vào bộ nhớ EEPROM
           EEPROM.put(0, myConfig); 
           Serial.println(F("💾 Đã lưu cấu hình mới vĩnh viễn vào EEPROM!"));
@@ -259,7 +272,7 @@ void loop() {
     shouldOpen = false;
   } else {
     // Chế độ tự động: Có tay thì mở và cập nhật mốc thời gian
-    if (handDistance > 0 && handDistance < NGHUONG_KHOANG_CACH) {
+    if (handDistance > 0 && handDistance < nguongMoNapCm) {
       shouldOpen = true;
       lidOpenTimer = millis(); // Ghi nhớ thời điểm cuối cùng nhìn thấy tay
     } 
@@ -290,11 +303,16 @@ void loop() {
   digitalWrite(GARBAGE_TRIG_PIN, LOW);
 
   garbageDuration = pulseIn(GARBAGE_ECHO_PIN, HIGH, 30000);
-  garbageDistance = garbageDuration * 0.034 / 2;
-  
-  // Sử dụng biến binHeightVal thay vì hằng số cố định BIN_HEIGHT
-  intGarbageLevel = map(garbageDistance, binHeightVal, 5, 0, 100);
-  intGarbageLevel = constrain(intGarbageLevel, 0, 100); 
+
+  // Chỉ cập nhật % rác khi cảm biến trả về echo hợp lệ (time-out = 0, có thể do dây lỏng/hỏng)
+  // -> Nếu time-out, GIỮ NGUYÊN intGarbageLevel cũ thay vì để tính ra 100% giả
+  if (garbageDuration > 0) {
+    garbageDistance = garbageDuration * 0.034 / 2;
+
+    // Tính % bằng nội suy float thủ công (map() của Arduino dùng long, sẽ cắt cụt phần thập phân)
+    float phanTramRac = ((float)binHeightVal - garbageDistance) / ((float)binHeightVal - nguongDayCm) * 100.0;
+    intGarbageLevel = constrain((int)round(phanTramRac), 0, 100);
+  }
 
   // ====== BUOC 3.5: ĐIỀU KHIỂN LOA DFPLAYER ======
   bool currentTrashFull = (intGarbageLevel >= nguongDayRac);
@@ -354,16 +372,16 @@ void loop() {
 
   // ====== BUOC 4 & 5: HIỂN THỊ LCD VÀ GỬI JSON (1 GIÂY/LẦN) ======
   if (millis() - lastDataSend >= 1000 || lastDataSend == 0) {
-    // Hàng 1: T:xx*C H:xx% G:xxxx
+    // Hàng 1: T:xx*C H:xxG:xxx (bỏ dấu % và khoảng trắng thừa để gas 3 chữ số không bị cắt ở cột 16)
     lcd.setCursor(0, 0);
     lcd.print("T:");
     lcd.print((int)nhietDo);
-    lcd.write(0); 
+    lcd.write(0);
     lcd.print("C H:");
     lcd.print((int)doAm);
-    lcd.print("% G:");
-    lcd.print(intGasValue); 
-    lcd.print("   "); 
+    lcd.print("G:");
+    lcd.print(intGasValue);
+    lcd.print("   ");
 
     // Hàng 2: Lid:DONG Rac:xxx%
     lcd.setCursor(0, 1);
