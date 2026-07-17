@@ -1,7 +1,6 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <DHT.h>
-#include <Servo.h> 
 #include <SoftwareSerial.h> // Khai báo thư viện giao tiếp ESP8266
 #include "DFRobotDFPlayerMini.h" // Thư viện cho DFPlayerMini
 #include <EEPROM.h> // Thư viện đọc/ghi bộ nhớ lưu trữ vĩnh viễn EEPROM trên Arduino
@@ -35,13 +34,12 @@ DFRobotDFPlayerMini myDFPlayer;
 const int NGHUONG_KHOANG_CACH = 15; 
 
 // Góc quay Servo
-const int GOC_MO_NAP = 120;   
-const int GOC_DONG_NAP = 40;   
+const int GOC_MO_NAP = 40;   
+const int GOC_DONG_NAP = 120;   
 
 // ====== KHỞI TẠO ĐỐI TƯỢNG ======
 LiquidCrystal_I2C lcd(0x27, 16, 2); 
 DHT dht(DHTPIN, DHTTYPE);
-Servo servoNapThung; 
 
 // ====== CẤU HÌNH BIẾN TOÀN CỤC ======
 unsigned long handDuration, garbageDuration;
@@ -87,6 +85,62 @@ int nguongDayRac;
 int nguongGas;
 int binHeightVal;
 int volumeVal;
+
+// ====== GỬI LỆNH THÔ ĐẾN DFPLAYER (KHÔNG DÙNG THƯ VIỆN, KHÔNG CHỜ PHẢN HỒI) ======
+// Giao thức DFPlayer Mini: [0x7E][0xFF][0x06][CMD][0x00][ParamH][ParamL][ChkH][ChkL][0xEF]
+void dfSendCmd(uint8_t cmd, uint16_t arg) {
+  uint8_t buf[10];
+  buf[0] = 0x7E;                   // Start byte
+  buf[1] = 0xFF;                   // Version
+  buf[2] = 0x06;                   // Length (luôn = 6)
+  buf[3] = cmd;                    // Mã lệnh
+  buf[4] = 0x00;                   // Feedback = 0 (KHÔNG YÊU CẦU PHẢN HỒI)
+  buf[5] = (uint8_t)(arg >> 8);    // Param byte cao
+  buf[6] = (uint8_t)(arg & 0xFF);  // Param byte thấp
+  int16_t chk = -(int16_t)(buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6]);
+  buf[7] = (uint8_t)(chk >> 8);    // Checksum byte cao
+  buf[8] = (uint8_t)(chk & 0xFF);  // Checksum byte thấp
+  buf[9] = 0xEF;                   // End byte
+
+  dfSerial.listen();
+  delay(20);
+  dfSerial.write(buf, 10);         // BẮN 10 BYTE RỒI ĐI LUÔN, KHÔNG CHỜ
+  delay(30);                       // Chờ tín hiệu đi hết dây
+  espSerial.listen();              // Trả quyền nghe cho ESP ngay lập tức
+}
+
+// ====== HÀM ĐIỀU KHIỂN SERVO BẰNG HARDWARE PWM (CHỐNG GIẬT 100%) ======
+// Sử dụng Timer1 của Arduino Uno trên chân D10 (OC1B)
+void setupHardwareServo() {
+  pinMode(SERVO_PIN, OUTPUT);
+  // Reset Timer1
+  TCCR1A = 0;
+  TCCR1B = 0;
+  // Mode 14: Fast PWM, TOP = ICR1
+  // COM1B1 = 1: Non-inverting PWM trên chân D10
+  TCCR1A |= (1 << WGM11) | (1 << COM1B1);
+  TCCR1B |= (1 << WGM13) | (1 << WGM12) | (1 << CS11); // Prescaler = 8
+  
+  // Tần số PWM 50Hz (20ms) -> TOP = 39999 (với prescaler 8, CPU 16MHz)
+  ICR1 = 39999;
+}
+
+void setServoAngle(int angle) {
+  // Servo thông thường: 0 độ = 544us, 180 độ = 2400us
+  // 1 tick của Timer1 (prescaler 8) = 0.5us
+  // 544us = 1088 ticks. 2400us = 4800 ticks. Khoảng cách = 3712 ticks.
+  long ticks = 1088 + ((long)angle * 3712) / 180;
+  OCR1B = ticks;
+}
+
+// Các lệnh DFPlayer Mini thông dụng (đã tra cứu từ datasheet)
+void safePlayTrack(int track) { dfSendCmd(0x03, track); }  // 0x03 = Play track
+void safeLoopTrack(int track) { dfSendCmd(0x08, track); }  // 0x08 = Loop single track
+void safeStopTrack() {
+  dfSendCmd(0x16, 0);   // 0x16 = Stop playback
+  delay(50);
+  dfSendCmd(0x19, 1);   // 0x19 = TắT chế độ Loop (param 1 = disable)
+}
 
 void setup() {
   Serial.begin(9600);
@@ -152,9 +206,9 @@ void setup() {
   // Khởi tạo cảm biến DHT11
   dht.begin();
 
-  // Khởi tạo và đưa Servo về trạng thái đóng ban đầu
-  servoNapThung.attach(SERVO_PIN);
-  servoNapThung.write(GOC_DONG_NAP);
+  // Khởi tạo và đưa Servo về trạng thái đóng ban đầu bằng Hardware PWM
+  setupHardwareServo();
+  setServoAngle(GOC_DONG_NAP);
 
   // Khởi tạo màn hình LCD
   lcd.init();
@@ -277,12 +331,14 @@ void loop() {
   }
 
   // Điều khiển Servo và cập nhật trạng thái
-  if (shouldOpen) {
-    servoNapThung.write(GOC_MO_NAP);
-    trangThaiLid = "MO "; 
-  } else {
-    servoNapThung.write(GOC_DONG_NAP);
-    trangThaiLid = "DONG";
+  if (shouldOpen != lastLidState) {
+    if (shouldOpen) {
+      setServoAngle(GOC_MO_NAP);
+      trangThaiLid = "MO "; 
+    } else {
+      setServoAngle(GOC_DONG_NAP);
+      trangThaiLid = "DONG";
+    }
   }
 
   // ====== BUOC 3: ĐO MỨC RÁC HIỆN TẠI (DÙNG CHIỀU CAO THÙNG CẤU HÌNH ĐỘNG) ======
@@ -304,54 +360,42 @@ void loop() {
 
   // 3.5.1 Lệnh còi hú từ giao diện Web ghi đè
   if (dfplayerReady && (manualAlarm != lastManualAlarm)) {
-    dfSerial.listen();
-    delay(10);
     if (manualAlarm) {
       Serial.println(F("🔊 [LOA BÁO ĐỘNG] -> Kích hoạt từ Web! Vòng lặp Bài 1..."));
-      myDFPlayer.loop(1);
+      safeLoopTrack(1);
     } else {
       Serial.println(F("🔇 [LOA BÁO ĐỘNG] -> Tắt còi báo động từ Web!"));
-      myDFPlayer.stop();
+      safeStopTrack();
     }
-    delay(10);
-    espSerial.listen(); // Trả lại quyền nghe lệnh cho ESP
     lastManualAlarm = manualAlarm;
   } else if (!dfplayerReady) {
-    lastManualAlarm = manualAlarm; // Cập nhật trạng thái để tránh lặp
+    lastManualAlarm = manualAlarm;
   }
 
   // 3.5.2 Chế độ tự động phát âm thanh khi còi hú tắt
   if (dfplayerReady && !manualAlarm) {
     // Trạng thái nắp thay đổi (Mở hoặc Đóng)
     if (shouldOpen != lastLidState) {
-      dfSerial.listen();
-      delay(10);
       if (shouldOpen) {
         if (currentTrashFull) {
           Serial.println(F("🔊 [LOA] -> Thung rac DAY! Phat canh bao (Bai 4)..."));
-          myDFPlayer.play(4);
+          safePlayTrack(4);
         } else {
-          Serial.println(F("🔊 [LOA] -> Nap MO! Xin moi ban bo rac (Bai 2)..."));
-          myDFPlayer.play(2);
+          Serial.println(F("🔊 [LOA] -> Nap MO! Xin moi ban bo rac (Bai 3)..."));
+          safePlayTrack(3);
         }
       } else {
-        Serial.println(F("🔊 [LOA] -> Nap DONG! Xin cam on da bo rac (Bai 3)."));
-        myDFPlayer.play(3);
+        Serial.println(F("🔊 [LOA] -> Nap DONG! Xin cam on da bo rac (Bai 2)."));
+        safePlayTrack(2);
       }
-      delay(10);
-      espSerial.listen(); // Trả lại quyền nghe lệnh cho ESP
       lastLidState = shouldOpen;
     }
 
     // Phát cảnh báo khi thùng rác vừa đầy lúc nắp đang đóng (phát 1 lần cảnh báo)
     if (currentTrashFull != lastTrashFullState) {
       if (currentTrashFull && !shouldOpen) {
-        dfSerial.listen();
-        delay(10);
         Serial.println(F("🔊 [LOA] -> Thung rac VUA DAY! Phat canh bao mot lan (Bai 4)..."));
-        myDFPlayer.play(4);
-        delay(10);
-        espSerial.listen(); // Trả lại quyền nghe lệnh cho ESP
+        safePlayTrack(4);
       }
       lastTrashFullState = currentTrashFull;
     }
@@ -365,6 +409,10 @@ void loop() {
       }
       lastLidState = shouldOpen;
     }
+    lastTrashFullState = currentTrashFull;
+  } else {
+    // Khi đang bật còi báo động: vẫn cập nhật trạng thái để không bị lệch khi tắt còi
+    lastLidState = shouldOpen;
     lastTrashFullState = currentTrashFull;
   }
 
