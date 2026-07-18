@@ -16,6 +16,12 @@ function App() {
   const [connectionStatus, setConnectionStatus] = useState('Đang kết nối MQTT...')
   const [isConnected, setIsConnected] = useState(false)
   
+  // Tự động phát hiện Backend URL
+  const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3001'
+    : (import.meta.env.VITE_API_URL || 'http://localhost:3001');
+  const wsUrl = apiUrl.replace(/^http/, 'ws');
+  
   const [sensorData, setSensorData] = useState({
     garbage_level: 0,
     gas: 0,
@@ -68,12 +74,16 @@ function App() {
   const isGarbageFull = sensorData.garbage_level >= trashThreshold
   const isGasHigh = sensorData.gas >= gasThreshold
 
-  const publishControl = (command) => {
-    if (mqttClient) {
-      mqttClient.publish("smarthome/bin/control", JSON.stringify({ command }), { qos: 1 });
-      console.log(`📤 Đã gửi lệnh MQTT: ${command}`);
-    } else {
-      console.warn("Chưa kết nối MQTT Broker, không thể điều khiển!");
+  const publishControl = async (command) => {
+    try {
+      await fetch(`${apiUrl}/api/control`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command })
+      });
+      console.log(`📤 Đã gửi lệnh điều khiển: ${command}`);
+    } catch (e) {
+      console.error('Lỗi gửi lệnh điều khiển:', e);
     }
   };
 
@@ -84,7 +94,7 @@ function App() {
       setCustomHistory(null);
     } else {
       try {
-        const response = await fetch(`http://localhost:3001/api/history?date=${dateStr}`);
+        const response = await fetch(`${apiUrl}/api/history?date=${dateStr}`);
         if (response.ok) {
           const data = await response.json();
           setCustomHistory(data);
@@ -99,68 +109,89 @@ function App() {
     }
   };
 
-  const [mqttClient, setMqttClient] = useState(null)
-
   useEffect(() => {
-    const brokerUrl = "wss://test.mosquitto.org:8081/mqtt"
-    const client = mqtt.connect(brokerUrl)
-    setMqttClient(client)
+    let socket;
+    let isMounted = true;
 
-    client.on("connect", () => {
-      setConnectionStatus("Đã kết nối Live (MQTT)")
-      setIsConnected(true)
-      client.subscribe("smarthome/bin/sensor_data")
-      client.subscribe("smarthome/bin/prediction")
-    })
+    const connectWS = () => {
+      socket = new WebSocket(wsUrl);
 
-    client.on("message", (topic, message) => {
-      try {
-        const data = JSON.parse(message.toString())
-        if (topic === "smarthome/bin/sensor_data") {
-          setSensorData(prev => {
-            const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            const newLogs = [];
-            
-            if (data.is_lid_open !== undefined && data.is_lid_open !== prev.is_lid_open) {
-              newLogs.push(`${timeStr} - Nắp thùng rác vừa ${data.is_lid_open ? 'MỞ 🔓' : 'ĐÓNG 🔒'}`);
-            }
-            if (data.garbage_level !== undefined && data.garbage_level !== prev.garbage_level) {
-              newLogs.push(`${timeStr} - Cập nhật mức rác: ${data.garbage_level}%`);
-              if (data.garbage_level >= trashThreshold) {
-                newLogs.push(`${timeStr} - ⚠️ CẢNH BÁO: Thùng rác đã đầy trên ${trashThreshold}%!`);
-              }
-            }
-            if (data.gas !== undefined && data.gas > gasThreshold && prev.gas <= gasThreshold) {
-              newLogs.push(`${timeStr} - 💨 CẢNH BÁO: Phát hiện mùi hôi thối vượt ngưỡng (${data.gas} ppm)`);
-            }
-            
-            if (newLogs.length > 0) {
-              setLogsList(prevLogs => {
-                const filtered = prevLogs.filter(l => !l.includes("Chưa có hoạt động"));
-                return [...newLogs, ...filtered].slice(0, 5);
-              });
-            }
-
-            return {
-              ...prev,
-              garbage_level: data.garbage_level !== undefined ? data.garbage_level : prev.garbage_level,
-              gas: data.gas !== undefined ? data.gas : prev.gas,
-              temperature: data.temperature !== undefined ? parseFloat(data.temperature).toFixed(1) : prev.temperature,
-              humidity: data.humidity !== undefined ? data.humidity : prev.humidity,
-              is_lid_open: data.is_lid_open !== undefined ? data.is_lid_open : prev.is_lid_open
-            };
-          });
-        } else if (topic === "smarthome/bin/prediction") {
-          if (data.prediction) setPrediction(data.prediction)
-          if (data.peak_time) setPeakTime(data.peak_time)
-          if (data.history && data.history.length > 0) setHistoryData(data.history)
+      socket.onopen = () => {
+        if (isMounted) {
+          setConnectionStatus("Đã kết nối Live (Backend WS)");
+          setIsConnected(true);
         }
-      } catch (error) {
-        console.error("Lỗi parse JSON: ", error)
-      }
-    })
+      };
 
-    return () => client.end()
+      socket.onmessage = (event) => {
+        try {
+          const { topic, data } = JSON.parse(event.data);
+
+          if (topic === "smarthome/bin/sensor_data") {
+            setSensorData(prev => {
+              const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+              const newLogs = [];
+              
+              if (data.is_lid_open !== undefined && data.is_lid_open !== prev.is_lid_open) {
+                newLogs.push(`${timeStr} - Nắp thùng rác vừa ${data.is_lid_open ? 'MỞ 🔓' : 'ĐÓNG 🔒'}`);
+              }
+              if (data.garbage_level !== undefined && data.garbage_level !== prev.garbage_level) {
+                newLogs.push(`${timeStr} - Cập nhật mức rác: ${data.garbage_level}%`);
+                if (data.garbage_level >= trashThreshold) {
+                  newLogs.push(`${timeStr} - ⚠️ CẢNH BÁO: Thùng rác đã đầy trên ${trashThreshold}%!`);
+                }
+              }
+              if (data.gas !== undefined && data.gas > gasThreshold && prev.gas <= gasThreshold) {
+                newLogs.push(`${timeStr} - 💨 CẢNH BÁO: Phát hiện mùi hôi thối vượt ngưỡng (${data.gas} ppm)`);
+              }
+              
+              if (newLogs.length > 0) {
+                setLogsList(prevLogs => {
+                  const filtered = prevLogs.filter(l => !l.includes("Chưa có hoạt động"));
+                  return [...newLogs, ...filtered].slice(0, 5);
+                });
+              }
+
+              return {
+                ...prev,
+                garbage_level: data.garbage_level !== undefined ? data.garbage_level : prev.garbage_level,
+                gas: data.gas !== undefined ? data.gas : prev.gas,
+                temperature: data.temperature !== undefined ? parseFloat(data.temperature).toFixed(1) : prev.temperature,
+                humidity: data.humidity !== undefined ? data.humidity : prev.humidity,
+                is_lid_open: data.is_lid_open !== undefined ? data.is_lid_open : prev.is_lid_open
+              };
+            });
+          } else if (topic === "smarthome/bin/prediction") {
+            if (data.prediction) setPrediction(data.prediction);
+            if (data.peak_time) setPeakTime(data.peak_time);
+            if (data.history && data.history.length > 0) setHistoryData(data.history);
+          }
+        } catch (error) {
+          console.error("Lỗi parse JSON: ", error);
+        }
+      };
+
+      socket.onclose = () => {
+        if (isMounted) {
+          setConnectionStatus("Mất kết nối Backend (Đang thử lại...)");
+          setIsConnected(false);
+          setTimeout(() => {
+            if (isMounted) connectWS();
+          }, 3000);
+        }
+      };
+
+      socket.onerror = (err) => {
+        console.error("Lỗi WebSocket:", err);
+      };
+    };
+
+    connectWS();
+
+    return () => {
+      isMounted = false;
+      if (socket) socket.close();
+    };
   }, [trashThreshold, gasThreshold])
 
   // Trigger notifications when sensorData violates thresholds

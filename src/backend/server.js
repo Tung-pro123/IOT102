@@ -20,6 +20,19 @@ const sensorTopic = "smarthome/bin/sensor_data";
 const predictionTopic = "smarthome/bin/prediction";
 
 let pool;
+let mqttClient;
+
+let latestSensorData = {
+  garbage_level: 0,
+  gas: 0,
+  temperature: 0,
+  humidity: 0,
+  is_lid_open: false
+};
+let latestPredictionData = {
+  prediction: "Đang thu thập...",
+  peak_time: "Đang tính..."
+};
 
 const http = require("http");
 
@@ -69,7 +82,7 @@ async function getHistoryByDate(dateStr) {
 const server = http.createServer(async (req, res) => {
   // Cấu hình CORS để React chạy cổng 5173 truy cập được
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
@@ -97,6 +110,31 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));
     }
+  } else if (parsedUrl.pathname === "/api/live") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      sensor: latestSensorData,
+      prediction: latestPredictionData
+    }));
+  } else if (parsedUrl.pathname === "/api/control" && req.method === "POST") {
+    let body = "";
+    req.on("data", chunk => body += chunk.toString());
+    req.on("end", () => {
+      try {
+        const payload = JSON.parse(body);
+        if (mqttClient && payload.command) {
+          mqttClient.publish("smarthome/bin/control", JSON.stringify({ command: payload.command }));
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true }));
+        } else {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "No MQTT client or invalid command" }));
+        }
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid JSON" }));
+      }
+    });
   } else {
     res.writeHead(404);
     res.end("API Not Found");
@@ -176,22 +214,23 @@ async function startApp() {
   });
 
   console.log("Đang kết nối tới MQTT Broker...");
-  const client = mqtt.connect(brokerUrl);
+  mqttClient = mqtt.connect(brokerUrl);
 
-  client.on("connect", () => {
+  mqttClient.on("connect", () => {
     console.log("✅ Kết nối MQTT thành công! Đang lắng nghe dữ liệu thùng rác...");
-    client.subscribe(sensorTopic);
-    client.subscribe(predictionTopic);
+    mqttClient.subscribe(sensorTopic);
+    mqttClient.subscribe(predictionTopic);
   });
 
-  client.on("message", async (topic, message) => {
+  mqttClient.on("message", async (topic, message) => {
     try {
       const data = JSON.parse(message.toString());
 
-      // Phát tới mobile app qua WebSocket
+      // Phát tới mobile app qua WebSocket (Giữ nguyên theo yêu cầu)
       broadcastToMobile(topic, data);
 
       if (topic === sensorTopic) {
+        latestSensorData = { ...latestSensorData, ...data };
         console.log(`\n📥 [DỮ LIỆU MỚI]: Mức rác: ${data.garbage_level}%`);
 
         if (pool && data.garbage_level !== undefined) {
@@ -201,6 +240,7 @@ async function startApp() {
           console.log(`💾 Đã lưu mức rác ${data.garbage_level}% vào Database.`);
         }
       } else if (topic === predictionTopic) {
+        latestPredictionData = { ...latestPredictionData, ...data };
         console.log(`🤖 [DỰ ĐOÁN]: ${data.prediction || ""} | Peak: ${data.peak_time || ""}`);
       }
     } catch (error) {

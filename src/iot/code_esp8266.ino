@@ -8,8 +8,8 @@
 #include "AudioGeneratorRTTTL.h"
 #include "AudioOutputI2S.h"
 
-const char* ssid = "LOC";
-const char* password = "11111111";
+const char* ssid = "Tung";
+const char* password = "12345678910";
 
 const char* mqtt_server = "test.mosquitto.org";
 const int mqtt_port = 1883;

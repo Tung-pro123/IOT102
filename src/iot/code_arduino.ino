@@ -54,6 +54,8 @@ String trangThaiLid = "DONG";
 
 bool lastLidState = false; 
 bool lastTrashFullState = false; 
+bool lastGasWarningState = false; 
+bool lastTempWarningState = false; 
 bool dfplayerReady = false; // Cờ kiểm tra DFPlayer đã sẵn sàng chưa
 
 // Ký tự độ C đặc biệt hiển thị trên LCD
@@ -148,14 +150,14 @@ void setup() {
   
   // --- ĐỌC CẤU HÌNH VĨNH VIỄN TỪ EEPROM ---
   EEPROM.get(0, myConfig);
-  if (myConfig.signature != 0xAA) {
-    // Nếu chưa từng cấu hình từ Web (chưa có chữ ký 0xAA), thiết lập mặc định
-    Serial.println(F("💾 EEPROM trống! Đang thiết lập cấu hình mặc định ban đầu..."));
-    myConfig.signature = 0xAA;
+  if (myConfig.signature != 0xAB) {
+    // Nếu chưa từng cấu hình từ Web (chưa có chữ ký 0xAB), thiết lập mặc định
+    Serial.println(F("💾 EEPROM trống hoặc phiên bản cũ! Đang thiết lập cấu hình mặc định ban đầu..."));
+    myConfig.signature = 0xAB;
     myConfig.nguongDayRac = 80;
     myConfig.nguongGas = 500;
     myConfig.binHeightVal = 25;
-    myConfig.volumeVal = 18;
+    myConfig.volumeVal = 30; // Chỉnh âm lượng MAX = 30 theo yêu cầu
     EEPROM.put(0, myConfig); // Lưu lại cấu hình mặc định vào EEPROM
   } else {
     Serial.println(F("💾 Đã tìm thấy cấu hình cũ lưu trong bộ nhớ EEPROM!"));
@@ -342,18 +344,24 @@ void loop() {
   }
 
   // ====== BUOC 3: ĐO MỨC RÁC HIỆN TẠI (DÙNG CHIỀU CAO THÙNG CẤU HÌNH ĐỘNG) ======
-  digitalWrite(GARBAGE_TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(GARBAGE_TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(GARBAGE_TRIG_PIN, LOW);
+  // CHỈ ĐO VÀ CẬP NHẬT MỨC RÁC KHI NẮP ĐÃ ĐÓNG HOÀN TOÀN (shouldOpen == false)
+  // Tránh việc đưa tay vào hoặc nắp mở làm cảm biến đo sai lệch (nhảy số lung tung)
+  if (!shouldOpen) {
+    digitalWrite(GARBAGE_TRIG_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(GARBAGE_TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(GARBAGE_TRIG_PIN, LOW);
 
-  garbageDuration = pulseIn(GARBAGE_ECHO_PIN, HIGH, 30000);
-  garbageDistance = garbageDuration * 0.034 / 2;
-  
-  // Sử dụng biến binHeightVal thay vì hằng số cố định BIN_HEIGHT
-  intGarbageLevel = map(garbageDistance, binHeightVal, 5, 0, 100);
-  intGarbageLevel = constrain(intGarbageLevel, 0, 100); 
+    garbageDuration = pulseIn(GARBAGE_ECHO_PIN, HIGH, 30000);
+    garbageDistance = garbageDuration * 0.034 / 2;
+    
+    // Kiểm tra khoảng cách đo được có hợp lệ hay không (không quá cao vượt chiều cao thùng)
+    if (garbageDistance > 0 && garbageDistance < (binHeightVal + 10)) {
+      intGarbageLevel = map(garbageDistance, binHeightVal, 5, 0, 100);
+      intGarbageLevel = constrain(intGarbageLevel, 0, 100); 
+    }
+  }
 
   // ====== BUOC 3.5: ĐIỀU KHIỂN LOA DFPLAYER ======
   bool currentTrashFull = (intGarbageLevel >= nguongDayRac);
@@ -399,6 +407,26 @@ void loop() {
       }
       lastTrashFullState = currentTrashFull;
     }
+
+    // 3.5.3 Phát cảnh báo khi rò rỉ khí gas vượt ngưỡng (phát 1 lần)
+    bool currentGasWarning = (intGasValue >= nguongGas);
+    if (currentGasWarning != lastGasWarningState) {
+      if (currentGasWarning && !shouldOpen) {
+        Serial.println(F("🔊 [LOA] -> PHÁT HIỆN KHÍ LẠ! Phát cảnh báo (Bài 5)..."));
+        safePlayTrack(5);
+      }
+      lastGasWarningState = currentGasWarning;
+    }
+
+    // 3.5.4 Phát cảnh báo khi nhiệt độ bất thường >= 40°C (phát 1 lần)
+    bool currentTempWarning = (nhietDo >= 40.0);
+    if (currentTempWarning != lastTempWarningState) {
+      if (currentTempWarning && !shouldOpen) {
+        Serial.println(F("🔊 [LOA] -> NHIỆT ĐỘ BẤT THƯỜNG! Phát cảnh báo (Bài 6)..."));
+        safePlayTrack(6);
+      }
+      lastTempWarningState = currentTempWarning;
+    }
   } else if (!dfplayerReady) {
     // Nếu không cắm loa, chỉ in log debug chứ không gọi lệnh âm thanh
     if (shouldOpen != lastLidState) {
@@ -410,10 +438,14 @@ void loop() {
       lastLidState = shouldOpen;
     }
     lastTrashFullState = currentTrashFull;
+    lastGasWarningState = (intGasValue >= nguongGas);
+    lastTempWarningState = (nhietDo >= 40.0);
   } else {
     // Khi đang bật còi báo động: vẫn cập nhật trạng thái để không bị lệch khi tắt còi
     lastLidState = shouldOpen;
     lastTrashFullState = currentTrashFull;
+    lastGasWarningState = (intGasValue >= nguongGas);
+    lastTempWarningState = (nhietDo >= 40.0);
   }
 
   // ====== BUOC 4 & 5: HIỂN THỊ LCD VÀ GỬI JSON (1 GIÂY/LẦN) ======
