@@ -108,6 +108,21 @@ npm start
 
 ---
 
+## 📸 Hình ảnh Giao diện Web & Mobile App (Showcase)
+
+### 1. Web Dashboard (Giám sát Real-time & Phân tích AI)
+| Web Dashboard Giám sát Real-time | Phân tích & Dự báo AI (Linear Regression) |
+| :---: | :---: |
+| ![Web Dashboard](docs/images/dashBoardWeb.png) | ![Web AI Predictions](docs/images/predect.png) |
+
+### 2. Ứng dụng Di động (EcoPulse IoT - React Native App)
+| Màn hình Chính & Command Center | Thống kê & Phân tích AI | Nhật ký & Cảnh báo Hệ thống |
+| :---: | :---: | :---: |
+| ![Mobile Home](docs/images/mobile.png) | ![Mobile AI Analytics](docs/images/mobile2.png) | ![Mobile System Alerts](docs/images/mobile3.png) |
+
+---
+
 ## 📝 Giấy phép & Bản quyền
 
 Dự án được thực hiện bởi sinh viên **Lê Thanh Tùng (MSSV: SE203438)** cho môn học **IOT102** tại Đại học FPT.
+
