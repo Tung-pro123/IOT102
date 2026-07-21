@@ -43,12 +43,14 @@ function App() {
   // Settings States
   const [trashThreshold, setTrashThreshold] = useState(() => Number(localStorage.getItem('trashThreshold')) || 80)
   const [gasThreshold, setGasThreshold] = useState(() => Number(localStorage.getItem('gasThreshold')) || 500)
+  const [tempWarningThreshold, setTempWarningThreshold] = useState(() => Number(localStorage.getItem('tempWarningThreshold')) || 29)
   const [binHeight, setBinHeight] = useState(() => Number(localStorage.getItem('binHeight')) || 25)
   const [speakerVolume, setSpeakerVolume] = useState(() => Number(localStorage.getItem('speakerVolume')) || 18)
 
   // Settings Temp States (for editing in Modal)
   const [tempTrashThreshold, setTempTrashThreshold] = useState(trashThreshold)
   const [tempGasThreshold, setTempGasThreshold] = useState(gasThreshold)
+  const [tempTempWarningThreshold, setTempTempWarningThreshold] = useState(tempWarningThreshold)
   const [tempBinHeight, setTempBinHeight] = useState(binHeight)
   const [tempSpeakerVolume, setTempSpeakerVolume] = useState(speakerVolume)
 
@@ -61,10 +63,11 @@ function App() {
     if (showSettings) {
       setTempTrashThreshold(trashThreshold)
       setTempGasThreshold(gasThreshold)
+      setTempTempWarningThreshold(tempWarningThreshold)
       setTempBinHeight(binHeight)
       setTempSpeakerVolume(speakerVolume)
     }
-  }, [showSettings, trashThreshold, gasThreshold, binHeight, speakerVolume])
+  }, [showSettings, trashThreshold, gasThreshold, tempWarningThreshold, binHeight, speakerVolume])
 
   // Notifications list
   const [notifications, setNotifications] = useState([
@@ -527,6 +530,21 @@ function App() {
                 />
               </div>
 
+              {/* Ngưỡng nhiệt độ cảnh báo */}
+              <div>
+                <label className="block font-semibold mb-1 text-left">Ngưỡng nhiệt độ cảnh báo (°C):</label>
+                <input 
+                  type="number" 
+                  min="20" 
+                  max="70" 
+                  value={tempTempWarningThreshold} 
+                  onChange={(e) => setTempTempWarningThreshold(Number(e.target.value))}
+                  className={`w-full p-2.5 rounded-xl border outline-none font-bold ${
+                    theme === 'cyber' ? 'bg-[#010906] border-emerald-950 text-emerald-400' : theme === 'dark' ? 'bg-[#0F172A] border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
+                  }`}
+                />
+              </div>
+
               {/* Chiều cao thùng */}
               <div>
                 <label className="block font-semibold mb-1 text-left">Chiều cao lòng thùng chứa (cm):</label>
@@ -569,15 +587,17 @@ function App() {
                 onClick={() => {
                   setTrashThreshold(tempTrashThreshold);
                   setGasThreshold(tempGasThreshold);
+                  setTempWarningThreshold(tempTempWarningThreshold);
                   setBinHeight(tempBinHeight);
                   setSpeakerVolume(tempSpeakerVolume);
                   localStorage.setItem('trashThreshold', tempTrashThreshold);
                   localStorage.setItem('gasThreshold', tempGasThreshold);
+                  localStorage.setItem('tempWarningThreshold', tempTempWarningThreshold);
                   localStorage.setItem('binHeight', tempBinHeight);
                   localStorage.setItem('speakerVolume', tempSpeakerVolume);
                   
                   // Publish MQTT config payload
-                  publishControl(`config:${tempTrashThreshold}:${tempGasThreshold}:${tempBinHeight}:${tempSpeakerVolume}`);
+                  publishControl(`config:${tempTrashThreshold}:${tempGasThreshold}:${tempBinHeight}:${tempSpeakerVolume}:${tempTempWarningThreshold}`);
                   
                   setShowSettings(false);
                 }}

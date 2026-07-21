@@ -83,7 +83,7 @@ export default function Dashboard({ sensorData, publishControl, isGarbageFull, i
 
       {/* Grid Hàng 1: Panel mô phỏng + Card cảm biến + Live terminal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        
+
         {/* Column 1: Mô phỏng thùng rác */}
         <div className={`p-6 rounded-2xl border flex flex-col items-center justify-between min-h-[460px] relative overflow-hidden transition-all duration-300 ${styles.card}`}>
           <div className={`absolute top-0 left-0 w-full h-1 ${theme === 'cyber' ? 'bg-emerald-500' : theme === 'dark' ? 'bg-indigo-500' : 'bg-indigo-500'}`}></div>
@@ -95,11 +95,11 @@ export default function Dashboard({ sensorData, publishControl, isGarbageFull, i
           {/* Physical Trash Can Graphic */}
           <div className="relative w-36 h-60 my-6 flex items-end justify-center">
             {/* Nắp xoay */}
-            <div 
+            <div
               className={`absolute -top-4 w-40 h-4 rounded-full transition-all duration-500 origin-right shadow-md z-10 ${theme === 'cyber' ? 'bg-emerald-700' : 'bg-slate-700'}`}
               style={{
-                transform: sensorData.is_lid_open 
-                  ? 'translateY(-15px) rotate(-40deg)' 
+                transform: sensorData.is_lid_open
+                  ? 'translateY(-15px) rotate(-40deg)'
                   : 'translateY(0) rotate(0)'
               }}
             >
@@ -115,12 +115,12 @@ export default function Dashboard({ sensorData, publishControl, isGarbageFull, i
               </div>
 
               {/* Lượng rác lấp đầy */}
-              <div 
+              <div
                 className="absolute bottom-0 w-full transition-all duration-1000 ease-out flex items-center justify-center"
                 style={{
                   height: `${sensorData.garbage_level}%`,
-                  background: isGarbageFull 
-                    ? 'linear-gradient(to top, #EF4444, #F87171)' 
+                  background: isGarbageFull
+                    ? 'linear-gradient(to top, #EF4444, #F87171)'
                     : sensorData.garbage_level >= 50
                       ? 'linear-gradient(to top, #F59E0B, #FBBF24)'
                       : 'linear-gradient(to top, #10B981, #34D399)'
@@ -157,19 +157,19 @@ export default function Dashboard({ sensorData, publishControl, isGarbageFull, i
                 🔄 Tự Động
               </button>
             </div>
-            
+
             <div className="flex gap-2">
               <button
                 onClick={() => publishControl('play_alarm')}
                 className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all duration-200 ${styles.btnAlarmOn}`}
               >
-                🔊 Bật Còi
+                🎵 Bật Nhạc
               </button>
               <button
                 onClick={() => publishControl('stop_alarm')}
                 className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all duration-200 ${styles.btnAlarmOff}`}
               >
-                🔇 Tắt Còi
+                🔇 Tắt Nhạc
               </button>
             </div>
           </div>
@@ -192,7 +192,7 @@ export default function Dashboard({ sensorData, publishControl, isGarbageFull, i
                 💨
               </div>
             </div>
-            
+
             <div className={`mt-4 w-full p-3 rounded-xl flex items-center justify-between transition-all duration-300 ${styles.statCard}`}>
               <span className="text-xs font-medium">Trạng thái:</span>
               <span className={`text-[10px] font-black px-2.5 py-1 rounded-md ${isGasHigh ? styles.badgeWarn : styles.badgeOk}`}>
@@ -206,7 +206,7 @@ export default function Dashboard({ sensorData, publishControl, isGarbageFull, i
             <div className="absolute top-0 left-0 w-full h-1 bg-rose-500"></div>
             <div className="flex justify-between items-start">
               <div>
-                <div className={`text-xs font-bold mb-2 uppercase tracking-wider ${styles.sub}`}>Nhiệt độ bên trong</div>
+                <div className={`text-xs font-bold mb-2 uppercase tracking-wider ${styles.sub}`}>Nhiệt độ bên ngoài</div>
                 <div className="flex items-baseline gap-1">
                   <span className={`text-4xl font-black tracking-tight ${theme === 'cyber' ? 'text-emerald-400' : theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{sensorData.temperature}</span>
                   <span className={`text-lg font-bold ${styles.sub}`}>°C</span>
@@ -273,7 +273,7 @@ export default function Dashboard({ sensorData, publishControl, isGarbageFull, i
             </h3>
             <p className={`text-xs mb-4 leading-normal ${styles.sub}`}>Các thay đổi trạng thái thời gian thực nhận qua MQTT Broker.</p>
           </div>
-          
+
           <div className={`flex-1 p-4 rounded-xl font-mono text-[10px] space-y-3 overflow-y-auto max-h-[350px] xl:max-h-[310px] border shadow-inner transition-all duration-300 ${styles.terminal}`}>
             {logsList.map((log, idx) => {
               const isWarning = log.includes("⚠️") || log.includes("💨");
@@ -285,7 +285,7 @@ export default function Dashboard({ sensorData, publishControl, isGarbageFull, i
               );
             })}
           </div>
-          
+
           <div className={`mt-4 text-[9px] font-semibold text-center uppercase tracking-wider ${styles.sub}`}>
             MQTT Client Active
           </div>
@@ -295,7 +295,7 @@ export default function Dashboard({ sensorData, publishControl, isGarbageFull, i
 
       {/* Grid Hàng 2: Biểu đồ giám sát thời gian thực + Chẩn đoán hệ thống (Lấp đầy nửa dưới màn hình) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Biểu đồ biến động mức rác */}
         <div className={`p-6 rounded-2xl border lg:col-span-2 transition-all duration-300 ${styles.card}`}>
           <div className="flex justify-between items-center mb-4">
@@ -305,18 +305,18 @@ export default function Dashboard({ sensorData, publishControl, isGarbageFull, i
               </h3>
               <p className={`text-xs ${styles.sub}`}>Biểu đồ cập nhật tự động dòng dữ liệu mức rác thực tế nhận từ cảm biến.</p>
             </div>
-            <span className={`text-[9px] font-black px-2 py-1 rounded-md bg-indigo-50 text-indigo-600 ${theme==='cyber'?'bg-emerald-950/40 text-emerald-400 border border-emerald-500/20':''}`}>
+            <span className={`text-[9px] font-black px-2 py-1 rounded-md bg-indigo-50 text-indigo-600 ${theme === 'cyber' ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/20' : ''}`}>
               Live Telemetry
             </span>
           </div>
-          
+
           <div className="h-60 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={historyData || []} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <defs>
                   <linearGradient id="dashboardLevel" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={styles.chartColor} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={styles.chartColor} stopOpacity={0.0}/>
+                    <stop offset="5%" stopColor={styles.chartColor} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={styles.chartColor} stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={styles.gridLines} />
@@ -335,27 +335,27 @@ export default function Dashboard({ sensorData, publishControl, isGarbageFull, i
             🩺 Chẩn đoán & Trạng thái Hệ thống
           </h3>
           <p className={`text-xs mb-4 leading-normal ${styles.sub}`}>Kiểm tra trạng thái kết nối phần cứng và phần mềm trung tâm.</p>
-          
+
           <div className="space-y-4 mt-6">
             <div className="flex justify-between items-center text-xs">
-              <span className={theme==='cyber'?'text-emerald-700':'text-slate-500 font-medium'}>Máy chủ Node.js:</span>
+              <span className={theme === 'cyber' ? 'text-emerald-700' : 'text-slate-500 font-medium'}>Máy chủ Node.js:</span>
               <span className="font-bold text-emerald-500 flex items-center gap-1">🟢 Connected</span>
             </div>
             <div className="flex justify-between items-center text-xs">
-              <span className={theme==='cyber'?'text-emerald-700':'text-slate-500 font-medium'}>Cơ sở dữ liệu SQL Server:</span>
+              <span className={theme === 'cyber' ? 'text-emerald-700' : 'text-slate-500 font-medium'}>Cơ sở dữ liệu SQL Server:</span>
               <span className="font-bold text-emerald-500 flex items-center gap-1">🟢 Connected</span>
             </div>
             <div className="flex justify-between items-center text-xs">
-              <span className={theme==='cyber'?'text-emerald-700':'text-slate-500 font-medium'}>Dịch vụ AI Python:</span>
+              <span className={theme === 'cyber' ? 'text-emerald-700' : 'text-slate-500 font-medium'}>Dịch vụ AI Python:</span>
               <span className="font-bold text-emerald-500 flex items-center gap-1">🟢 Active</span>
             </div>
             <div className="flex justify-between items-center text-xs">
-              <span className={theme==='cyber'?'text-emerald-700':'text-slate-500 font-medium'}>Giao tiếp UART (9600 bps):</span>
+              <span className={theme === 'cyber' ? 'text-emerald-700' : 'text-slate-500 font-medium'}>Giao tiếp UART (9600 bps):</span>
               <span className="font-bold text-emerald-500 flex items-center gap-1">🟢 Online</span>
             </div>
             <div className="flex justify-between items-center text-xs">
-              <span className={theme==='cyber'?'text-emerald-700':'text-slate-500 font-medium'}>Uptime hệ thống:</span>
-              <span className={`font-mono font-bold ${theme==='cyber'?'text-emerald-350':'text-slate-700'}`}>02d : 14h : 22m</span>
+              <span className={theme === 'cyber' ? 'text-emerald-700' : 'text-slate-500 font-medium'}>Uptime hệ thống:</span>
+              <span className={`font-mono font-bold ${theme === 'cyber' ? 'text-emerald-350' : 'text-slate-700'}`}>02d : 14h : 22m</span>
             </div>
           </div>
         </div>

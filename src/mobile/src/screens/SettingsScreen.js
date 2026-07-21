@@ -9,6 +9,7 @@ export default function SettingsScreen() {
   const [ipInput, setIpInput] = useState(serverIp);
   const [trashThreshold, setTrashThreshold] = useState('80');
   const [gasThreshold, setGasThreshold] = useState('500');
+  const [tempThreshold, setTempThreshold] = useState('29');
   const [binHeight, setBinHeight] = useState(25); // Mặc định 25 cm
   const [speakerVolume, setSpeakerVolume] = useState(18); // Mặc định 18 (từ 0 đến 30)
 
@@ -18,11 +19,13 @@ export default function SettingsScreen() {
       try {
         const savedTrash = await AsyncStorage.getItem('CFG_TRASH');
         const savedGas = await AsyncStorage.getItem('CFG_GAS');
+        const savedTemp = await AsyncStorage.getItem('CFG_TEMP');
         const savedHeight = await AsyncStorage.getItem('CFG_HEIGHT');
         const savedVolume = await AsyncStorage.getItem('CFG_VOLUME');
         
         if (savedTrash) setTrashThreshold(savedTrash);
         if (savedGas) setGasThreshold(savedGas);
+        if (savedTemp) setTempThreshold(savedTemp);
         if (savedHeight) setBinHeight(Number(savedHeight));
         if (savedVolume) setSpeakerVolume(Number(savedVolume));
       } catch (e) {
@@ -47,16 +50,17 @@ export default function SettingsScreen() {
       Alert.alert('Lỗi', 'Chưa kết nối đến Server, không thể gửi cấu hình.');
       return;
     }
-    // Định dạng lệnh config: config:TrashThreshold:GasThreshold:BinHeight:SpeakerVolume
-    const cmd = `config:${trashThreshold}:${gasThreshold}:${binHeight}:${speakerVolume}`;
+    // Định dạng lệnh config: config:TrashThreshold:GasThreshold:BinHeight:SpeakerVolume:TempThreshold
+    const cmd = `config:${trashThreshold}:${gasThreshold}:${binHeight}:${speakerVolume}:${tempThreshold}`;
     sendCommand(cmd);
 
     try {
       await AsyncStorage.setItem('CFG_TRASH', trashThreshold);
       await AsyncStorage.setItem('CFG_GAS', gasThreshold);
+      await AsyncStorage.setItem('CFG_TEMP', tempThreshold);
       await AsyncStorage.setItem('CFG_HEIGHT', String(binHeight));
       await AsyncStorage.setItem('CFG_VOLUME', String(speakerVolume));
-      Alert.alert('Đồng bộ thành công', `Đã đồng bộ thông số cấu hình:\n- Ngưỡng rác: ${trashThreshold}%\n- Ngưỡng gas: ${gasThreshold} ppm\n- Chiều cao thùng: ${binHeight} cm\n- Âm lượng loa: ${speakerVolume}/30`);
+      Alert.alert('Đồng bộ thành công', `Đã đồng bộ thông số cấu hình:\n- Ngưỡng rác: ${trashThreshold}%\n- Ngưỡng gas: ${gasThreshold} ppm\n- Ngưỡng nhiệt độ: ${tempThreshold}°C\n- Chiều cao thùng: ${binHeight} cm\n- Âm lượng loa: ${speakerVolume}/30`);
     } catch (e) {
       console.error('Error saving config', e);
     }
@@ -119,7 +123,9 @@ export default function SettingsScreen() {
             onChangeText={setIpInput}
             placeholder="192.168.1.xxx"
             placeholderTextColor="#475569"
-            keyboardType="numeric"
+            keyboardType="numbers-and-punctuation"
+            autoCapitalize="none"
+            autoCorrect={false}
           />
           <TouchableOpacity style={styles.btnSave} onPress={handleSaveIp}>
             <Text style={styles.btnSaveText}>LƯU & KẾT NỐI LẠI</Text>
@@ -149,6 +155,15 @@ export default function SettingsScreen() {
             style={[styles.input, { borderColor: 'rgba(245, 158, 11, 0.3)' }]}
             value={gasThreshold}
             onChangeText={setGasThreshold}
+            keyboardType="numeric"
+            placeholderTextColor="#475569"
+          />
+
+          <Text style={styles.label}>Ngưỡng nhiệt độ cảnh báo (°C)</Text>
+          <TextInput 
+            style={[styles.input, { borderColor: 'rgba(245, 158, 11, 0.3)' }]}
+            value={tempThreshold}
+            onChangeText={setTempThreshold}
             keyboardType="numeric"
             placeholderTextColor="#475569"
           />

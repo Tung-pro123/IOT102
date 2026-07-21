@@ -51,7 +51,7 @@ export default function NotificationScreen() {
       });
     }
 
-    if (sensorData.temperature >= 40) {
+    if (sensorData.temperature >= 29) {
       list.unshift({
         id: 'danger_temp',
         title: 'CẢNH BÁO: Quá nhiệt!',

@@ -80,6 +80,7 @@ struct ConfigData {
   int nguongGas;        // Ngưỡng khí gas (kiểu int chiếm 2 byte)
   byte binHeightVal;    // Chiều cao thùng
   byte volumeVal;       // Âm lượng loa
+  byte nguongNhietDo;   // Ngưỡng nhiệt độ cảnh báo
 } myConfig;
 
 // Các biến cấu hình động được gán từ bộ nhớ EEPROM hoặc mặc định
@@ -87,6 +88,7 @@ int nguongDayRac;
 int nguongGas;
 int binHeightVal;
 int volumeVal;
+int nguongNhietDo;
 
 // ====== GỬI LỆNH THÔ ĐẾN DFPLAYER (KHÔNG DÙNG THƯ VIỆN, KHÔNG CHỜ PHẢN HỒI) ======
 // Giao thức DFPlayer Mini: [0x7E][0xFF][0x06][CMD][0x00][ParamH][ParamL][ChkH][ChkL][0xEF]
@@ -150,14 +152,15 @@ void setup() {
   
   // --- ĐỌC CẤU HÌNH VĨNH VIỄN TỪ EEPROM ---
   EEPROM.get(0, myConfig);
-  if (myConfig.signature != 0xAB) {
-    // Nếu chưa từng cấu hình từ Web (chưa có chữ ký 0xAB), thiết lập mặc định
+  if (myConfig.signature != 0xAC) {
+    // Nếu chưa từng cấu hình từ Web (chưa có chữ ký 0xAC), thiết lập mặc định
     Serial.println(F("💾 EEPROM trống hoặc phiên bản cũ! Đang thiết lập cấu hình mặc định ban đầu..."));
-    myConfig.signature = 0xAB;
+    myConfig.signature = 0xAC;
     myConfig.nguongDayRac = 80;
     myConfig.nguongGas = 500;
     myConfig.binHeightVal = 25;
     myConfig.volumeVal = 30; // Chỉnh âm lượng MAX = 30 theo yêu cầu
+    myConfig.nguongNhietDo = 29; // Ngưỡng nhiệt độ mặc định 29°C
     EEPROM.put(0, myConfig); // Lưu lại cấu hình mặc định vào EEPROM
   } else {
     Serial.println(F("💾 Đã tìm thấy cấu hình cũ lưu trong bộ nhớ EEPROM!"));
@@ -168,11 +171,13 @@ void setup() {
   nguongGas = myConfig.nguongGas;
   binHeightVal = myConfig.binHeightVal;
   volumeVal = myConfig.volumeVal;
+  nguongNhietDo = myConfig.nguongNhietDo;
 
   Serial.print(F("🔧 Cấu hình hiện tại - Rác: ")); Serial.print(nguongDayRac);
   Serial.print(F("%, Gas: ")); Serial.print(nguongGas);
   Serial.print(F("ppm, Cao: ")); Serial.print(binHeightVal);
-  Serial.print(F("cm, Vol: ")); Serial.println(volumeVal);
+  Serial.print(F("cm, Vol: ")); Serial.print(volumeVal);
+  Serial.print(F(", Temp: ")); Serial.println(nguongNhietDo);
 
   espSerial.begin(9600); // Khởi động Serial sang ESP8266
   
@@ -250,22 +255,27 @@ void loop() {
         manualAlarm = false;
       } 
       
-      // XỬ LÝ LỆNH CẤU HÌNH ĐỘNG TỪ WEB VÀ LƯU VÀO EEPROM: config:trash:gas:height:vol
+      // XỬ LÝ LỆNH CẤU HÌNH ĐỘNG TỪ WEB VÀ LƯU VÀO EEPROM: config:trash:gas:height:vol:temp
       else if (command.startsWith("config:")) {
-        char tempBuf[40];
-        command.toCharArray(tempBuf, 40);
-        int trash, gas, height, vol;
-        if (sscanf(tempBuf, "config:%d:%d:%d:%d", &trash, &gas, &height, &vol) == 4) {
+        char tempBuf[50];
+        command.toCharArray(tempBuf, 50);
+        int trash, gas, height, vol, tempVal = 29;
+        int parsed = sscanf(tempBuf, "config:%d:%d:%d:%d:%d", &trash, &gas, &height, &vol, &tempVal);
+        if (parsed >= 4) {
           nguongDayRac = trash;
           nguongGas = gas;
           binHeightVal = height;
           volumeVal = vol;
+          if (parsed >= 5) {
+            nguongNhietDo = tempVal;
+          }
           
           // Ghi đè cấu hình mới vào struct
           myConfig.nguongDayRac = nguongDayRac;
           myConfig.nguongGas = nguongGas;
           myConfig.binHeightVal = binHeightVal;
           myConfig.volumeVal = volumeVal;
+          myConfig.nguongNhietDo = nguongNhietDo;
           
           // Ghi cấu hình mới vĩnh viễn vào bộ nhớ EEPROM
           EEPROM.put(0, myConfig); 
@@ -276,7 +286,7 @@ void loop() {
           delay(10);
           myDFPlayer.volume(volumeVal);
           delay(10);
-          espSerial.listen(); // Trả lại quyền lắng nghe lệnh cho ESP8266
+          espSerial.listen(); // Trả lại quyền lắng hệ lệnh cho ESP8266
         }
       }
     }
@@ -419,7 +429,7 @@ void loop() {
     }
 
     // 3.5.4 Phát cảnh báo khi nhiệt độ bất thường >= 40°C (phát 1 lần)
-    bool currentTempWarning = (nhietDo >= 40.0);
+    bool currentTempWarning = (nhietDo >= (float)nguongNhietDo);
     if (currentTempWarning != lastTempWarningState) {
       if (currentTempWarning && !shouldOpen) {
         Serial.println(F("🔊 [LOA] -> NHIỆT ĐỘ BẤT THƯỜNG! Phát cảnh báo (Bài 6)..."));
@@ -439,13 +449,13 @@ void loop() {
     }
     lastTrashFullState = currentTrashFull;
     lastGasWarningState = (intGasValue >= nguongGas);
-    lastTempWarningState = (nhietDo >= 40.0);
+    lastTempWarningState = (nhietDo >= (float)nguongNhietDo);
   } else {
     // Khi đang bật còi báo động: vẫn cập nhật trạng thái để không bị lệch khi tắt còi
     lastLidState = shouldOpen;
     lastTrashFullState = currentTrashFull;
     lastGasWarningState = (intGasValue >= nguongGas);
-    lastTempWarningState = (nhietDo >= 40.0);
+    lastTempWarningState = (nhietDo >= (float)nguongNhietDo);
   }
 
   // ====== BUOC 4 & 5: HIỂN THỊ LCD VÀ GỬI JSON (1 GIÂY/LẦN) ======
