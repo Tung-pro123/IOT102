@@ -42,35 +42,30 @@ async function getHistoryByDate(dateStr) {
     throw new Error("Chưa kết nối Database");
   }
   try {
+    // Gom nhóm dữ liệu theo từng Phút (HH:mm), lấy mức rác Trung bình của phút đó
     const result = await pool.request()
       .input("date", sql.VarChar, dateStr)
       .query(`
-        SELECT timestamp, garbage_level
+        SELECT 
+          CONVERT(VARCHAR(5), timestamp, 108) AS time_min,
+          AVG(garbage_level) AS avg_level,
+          MAX(timestamp) AS max_time
         FROM GarbageHistory
         WHERE CONVERT(DATE, timestamp) = @date
-        ORDER BY timestamp ASC
+        GROUP BY CONVERT(VARCHAR(5), timestamp, 108)
+        ORDER BY max_time DESC
       `);
 
     const records = result.recordset;
     if (records.length === 0) return [];
     
-    // Thu thập tối đa khoảng 50 điểm trải đều trong ngày
-    const maxPoints = 50;
-    const step = Math.max(1, Math.floor(records.length / maxPoints));
-    const history = [];
+    // Lấy 100 phút gần nhất hiển thị lên trang Reports
+    const history = records.slice(0, 100).map(row => ({
+      time: row.time_min,
+      actual: Math.round(row.avg_level),
+      prediction: null
+    }));
     
-    for (let i = 0; i < records.length; i += step) {
-      const row = records[i];
-      const timeStr = new Date(row.timestamp).toLocaleTimeString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-      history.push({
-        time: timeStr,
-        actual: Math.round(row.garbage_level),
-        prediction: null
-      });
-    }
     return history;
   } catch (err) {
     console.error("Lỗi khi truy vấn lịch sử theo ngày:", err);

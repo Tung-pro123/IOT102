@@ -15,7 +15,7 @@ Servo myServo;
 unsigned long lastServoAction = 0;
 const unsigned long servoInterval = 1000; // Xoay servo mỗi 1.0 giây để test tải liên tục
 bool isLidOpen = false;
-
+ 
 void setup() {
   Serial.begin(9600);
   Serial.println("=== KHOI DONG STRESS-TEST SERVO & LOA ===");

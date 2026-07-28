@@ -397,7 +397,7 @@ void loop() {
       if (shouldOpen) {
         if (currentTrashFull) {
           Serial.println(F("🔊 [LOA] -> Thung rac DAY! Phat canh bao (Bai 4)..."));
-          safePlayTrack(4);
+          safePlayTrack(4); 
         } else {
           Serial.println(F("🔊 [LOA] -> Nap MO! Xin moi ban bo rac (Bai 3)..."));
           safePlayTrack(3);
