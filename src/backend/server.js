@@ -59,8 +59,8 @@ async function getHistoryByDate(dateStr) {
     const records = result.recordset;
     if (records.length === 0) return [];
     
-    // Lấy 100 phút gần nhất hiển thị lên trang Reports
-    const history = records.slice(0, 100).map(row => ({
+    // Lấy 100 phút gần nhất hiển thị lên trang Reports, đảo lại thành thứ tự tăng dần theo thời gian
+    const history = records.slice(0, 100).reverse().map(row => ({
       time: row.time_min,
       actual: Math.round(row.avg_level),
       prediction: null
