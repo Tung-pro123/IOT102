@@ -1,15 +1,12 @@
-throw new Error('POLYFILL IS RUNNING SUCCESSFULLY');
-
-// Polyfill for DOMException in React Native
+// Polyfill for DOMException in React Native (Hermes)
 if (typeof global.DOMException === 'undefined') {
-  var DOMException = function(message, name) {
-    this.message = message || '';
-    this.name = name || 'DOMException';
-    this.stack = (new Error()).stack;
-  };
-  DOMException.prototype = Object.create(Error.prototype);
-  DOMException.prototype.constructor = DOMException;
-
+  class DOMException extends Error {
+    constructor(message, name) {
+      super(message);
+      this.name = name || 'DOMException';
+    }
+  }
+  
   global.DOMException = DOMException;
   globalThis.DOMException = DOMException;
   console.log('✅ DOMException polyfill applied');

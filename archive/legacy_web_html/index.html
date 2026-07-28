@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Waste Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  </head>
+  <body class="bg-slate-100 font-sans p-6">
+    <div class="max-w-6xl mx-auto">
+      <header
+        class="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm mb-6"
+      >
+        <div>
+          <h1 class="text-2xl font-bold text-slate-800">
+            Smart Waste Management
+          </h1>
+          <p class="text-slate-500">Giám sát hệ thống thùng rác Real-time</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="relative flex h-3 w-3">
+            <span
+              id="ping-ping"
+              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"
+            ></span>
+            <span
+              id="status-dot"
+              class="relative inline-flex rounded-full h-3 w-3 bg-red-500"
+            ></span>
+          </span>
+          <span
+            id="connection-status"
+            class="text-sm font-semibold text-slate-600"
+            >Đang kết nối MQTT...</span
+          >
+        </div>
+      </header>
+
+      <div
+        id="alert-box"
+        class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow-sm"
+        role="alert"
+      >
+        <p class="font-bold">⚠️ Cảnh báo!</p>
+        <p>Thùng rác đã vượt mức 80%, yêu cầu dọn dẹp ngay lập tức.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-emerald-500 flex flex-col justify-between"
+        >
+          <div
+            class="text-slate-500 text-sm font-semibold mb-2 uppercase tracking-wide"
+          >
+            Mức rác hiện tại
+          </div>
+          <div class="flex items-end gap-2 mb-4">
+            <span id="garbage-val" class="text-5xl font-bold text-slate-800"
+              >0</span
+            >
+            <span class="text-xl text-slate-500 mb-1">%</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-4">
+            <div
+              id="garbage-bar"
+              class="bg-emerald-500 h-4 rounded-full transition-all duration-500"
+              style="width: 0%"
+            ></div>
+          </div>
+        </div>
+
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-orange-500 flex flex-col justify-between"
+        >
+          <div
+            class="text-slate-500 text-sm font-semibold mb-2 uppercase tracking-wide"
+          >
+            Nồng độ khí / Mùi
+          </div>
+          <div class="flex items-end gap-2">
+            <span id="gas-val" class="text-5xl font-bold text-slate-800"
+              >0</span
+            >
+            <span class="text-xl text-slate-500 mb-1">ppm</span>
+          </div>
+          <div
+            id="gas-status"
+            class="mt-4 text-sm font-medium text-emerald-600 bg-emerald-50 inline-block px-3 py-1 rounded-full w-max"
+          >
+            Không khí trong lành
+          </div>
+        </div>
+
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-rose-500 flex flex-col justify-between"
+        >
+          <div
+            class="text-slate-500 text-sm font-semibold mb-2 uppercase tracking-wide"
+          >
+            Nhiệt độ bên trong
+          </div>
+          <div class="flex items-end gap-2">
+            <span id="temp-val" class="text-5xl font-bold text-slate-800"
+              >0</span
+            >
+            <span class="text-xl text-slate-500 mb-1">°C</span>
+          </div>
+          <p class="mt-4 text-sm text-slate-500">Đo lường bằng DHT11</p>
+        </div>
+
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-500 flex flex-col justify-between"
+        >
+          <div
+            class="text-slate-500 text-sm font-semibold mb-2 uppercase tracking-wide"
+          >
+            Độ ẩm bên trong
+          </div>
+          <div class="flex items-end gap-2">
+            <span id="humidity-val" class="text-5xl font-bold text-slate-800"
+              >0</span
+            >
+            <span class="text-xl text-slate-500 mb-1">%</span>
+          </div>
+          <p class="mt-4 text-sm text-slate-500">Đo lường bằng DHT11</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Đổi sang cổng 8081 nếu dùng Mosquitto bảo mật (wss)
+      const brokerUrl = "wss://test.mosquitto.org:8081/mqtt";
+      const topic = "smarthome/bin/sensor_data";
+
+      // Khai báo các ID HTML
+      const statusText = document.getElementById("connection-status");
+      const statusDot = document.getElementById("status-dot");
+      const pingPing = document.getElementById("ping-ping");
+      const alertBox = document.getElementById("alert-box");
+
+      const garbageVal = document.getElementById("garbage-val");
+      const garbageBar = document.getElementById("garbage-bar");
+      const gasVal = document.getElementById("gas-val");
+      const gasStatus = document.getElementById("gas-status");
+      const humidityVal = document.getElementById("humidity-val");
+
+      // Khai báo thêm biến nhiệt độ
+      const tempVal = document.getElementById("temp-val");
+
+      console.log("Đang thử kết nối WebSockets tới MQTT...");
+      const client = mqtt.connect(brokerUrl);
+
+      client.on("connect", () => {
+        console.log("✅ Đã kết nối MQTT thành công!");
+        statusText.innerText = "Đã kết nối Live (MQTT)";
+        statusText.classList.replace("text-slate-600", "text-emerald-600");
+        statusDot.classList.replace("bg-red-500", "bg-emerald-500");
+        pingPing.classList.replace("bg-red-400", "bg-emerald-400");
+        client.subscribe(topic);
+      });
+
+      client.on("message", (topic, message) => {
+        try {
+          const data = JSON.parse(message.toString());
+          console.log("Dữ liệu mới: ", data);
+
+          // Cập nhật Mức Rác
+          garbageVal.innerText = data.garbage_level;
+          garbageBar.style.width = data.garbage_level + "%";
+          if (data.garbage_level >= 80) {
+            garbageBar.classList.replace("bg-emerald-500", "bg-red-500");
+            alertBox.classList.remove("hidden");
+          } else {
+            garbageBar.classList.replace("bg-red-500", "bg-emerald-500");
+            alertBox.classList.add("hidden");
+          }
+
+          // Cập nhật Khí Gas
+          gasVal.innerText = data.gas;
+          if (data.gas > 500) {
+            gasStatus.innerText = "Phát hiện mùi hôi!";
+            gasStatus.classList.replace("text-emerald-600", "text-red-600");
+            gasStatus.classList.replace("bg-emerald-50", "bg-red-100");
+          } else {
+            gasStatus.innerText = "Không khí trong lành";
+            gasStatus.classList.replace("text-red-600", "text-emerald-600");
+            gasStatus.classList.replace("bg-red-100", "bg-emerald-50");
+          }
+
+          // Cập nhật Độ ẩm
+          if (data.humidity !== undefined) {
+            humidityVal.innerText = data.humidity;
+          }
+
+          // Cập nhật Nhiệt độ
+          if (data.temperature !== undefined) {
+            tempVal.innerText = parseFloat(data.temperature).toFixed(1); // Làm tròn 1 chữ số thập phân
+          }
+        } catch (error) {
+          console.error("Lỗi parse JSON: ", error);
+        }
+      });
+    </script>
+  </body>
+</html>

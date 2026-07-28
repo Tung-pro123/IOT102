@@ -1,0 +1,5 @@
+## SELF-ASSESSMENT CHECKLIST (Trước khi nộp) Kiểm tra kỹ trước khi nộp. MỖI ENTRY phải pass ≥4/5 tiêu chí dưới đây. A. KIỂM TRA CHẤT LƯỢNG MỖI ENTRY (Pass ≥4/5) # Tiêu chí Pass? Note 1 Prompt này ảnh hưởng đến quyết định quan trọng trong project? ☐ 2 Nếu không có prompt này, project có thay đổi về architecture/design? ☐ 3 Tôi có thể giải thích lý do chọn/không chọn gợi ý của AI? ☐ 4 Có minh chứng cụ thể (code, metrics, comparison)? ☐ 5 Prompt này phản ánh tư duy phản biện, không chỉ copy AI? ☐ B. KIỂM TRA TỔNG THỂ LOG # Tiêu chí Pass? Current Value 1 Số lượng entries nằm trong range (min-max)? ☐ 2 Mỗi DTC component có ít nhất 1 core prompt? ☐ 3 Đã phát hiện ≥ số lượng hallucination yêu cầu? ☐ 4 Mỗi entry đều có Human Delta đầy đủ (4 câu hỏi)? ☐ 5 Có evidence cho ≥70% entries? ☐ ⚠ LƯU Ý QUAN TRỌNG: Nếu entry KHÔNG pass ≥4/5 tiêu chí → LOẠI BỎ, không ghi vào Log Nếu FAIL ≥2 tiêu chí tổng thể → AI Reflection = 0 điểm (mất 30%) C. CHUẨN BỊ CHO ORAL VIVAS (Q&A) Giảng viên sẽ hỏi ngẫu nhiên về 3-5 entries. Tự hỏi bản thân: Entry # Tôi có thể giải thích tại sao chọn approach này? Tôi có nhớ AI response? Tôi có evidence?
+
+---
+
+001 002 003
